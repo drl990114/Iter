@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-05T05:42:38+00:00",
+  "kind": "redacted_native_host_trials",
+  "platform": "macOS",
+  "candidate": "Unreleased development snapshot, originally labeled 0.1.1-beta.1 and based on 265fb628f5781eb584fc62ccc059adbb01dab1be; predates the initial 0.1.0 release",
+  "limit": "Developer-authored isolated scenarios, not real-user feedback. Skill snapshot hashes identify exactly what each native host loaded. Offline checks were recorded separately; later commits require their own CI. Process exit alone does not prove behavior.",
+  "sessions": [
+    {
+      "workspace_case": "codex-en",
+      "step": "01-open",
+      "process": {
+        "host": "codex",
+        "exit_code": 1,
+        "timed_out": false,
+        "elapsed_seconds": 15.89,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill to suggest the next improvement for this Note Counter. Use only this isolated project as evidence. Reply in English. I have not selected a feature or authorized implementation. Do not access the network, install dependencies, use other skills, or modify the product. Present concrete choices and stop for my selection.\n",
+      "final_response": null,
+      "reviewed_outcome": "incomplete_cli_model_incompatibility",
+      "model_turn_completed": false
+    },
+    {
+      "workspace_case": "codex-en",
+      "step": "01-open-current",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 91.97,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill to suggest the next improvement for this Note Counter. Use only this isolated project as evidence. Reply in English. I have not selected a feature or authorized implementation. Do not access the network, install dependencies, use other skills, or modify the product. Present concrete choices and stop for my selection.\n",
+      "final_response": "**I recommend clearer directory errors first:** it makes mistakes easier to fix while keeping this tiny CLI simple.\n\nThe [current implementation](<trial-root>/codex-en/count_notes.py:7) counts immediate files with exactly `.md` and leaves directory-access exceptions unhandled. These proposals use only project source; runtime baselines and user demand remain unmeasured.\n\n| Choice | Benefit and smallest scope | Acceptance and proposed validation | Main risk and tradeoff |\n|---|---|---|---|\n| **1. Clear directory errors** | Explain missing paths and paths pointing to files through concise stderr messages and a nonzero exit code. | CLI tests using synthetic missing/file paths: both fail without a traceback or stdout; valid and empty folders retain correct counts. | Broad exception handling could conceal bugs; catch only the specified errors. Improves usability without expanding counting capabilities. |\n| **2. Optional recursive counting** | Add `--recursive` for notes organized into subfolders; retain immediate-only counting by default and avoid following directory symlinks. | A fixture containing two top-level notes and one nested note produces **2 normally, 3 recursively**; non-Markdown files remain excluded. | Large trees cost more time, and hidden/generated folders may contribute notes. Ignore rules would remain outside this scope. |\n| **3. Optional case-insensitive extensions** | Add `--ignore-case` so `.MD` and `.Md` can count alongside `.md`. | A fixture containing `a.md`, `b.MD`, `c.Md`, and `d.txt` produces **1 normally, 3 with the flag**. | Adds another option for a need not yet demonstrated. Keeping it optional preserves current matching behavior. |\n\nAll three can reuse the existing `argparse` and `pathlib`; proposed tests can use standard-library `unittest`, without additional dependencies.\n\nSelecting an option authorizes its described implementation in `count_notes.py` and documentation in `README.md`. **Local testing is a separate grant:** it would add focused tests and create synthetic fixtures only inside this workspace, removing temporary fixtures afterward. Product edits remain recoverable by reverting the scoped changes.\n\nPlease select an option and indicate **“with local tests”** or **“implementation only.”** No product files were changed and no tests were run.",
+      "reviewed_outcome": "reviewed_pass",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "codex-en",
+      "step": "02-selected",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 182.29,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill. I choose optional --recursive counting. Default behavior must still count only immediate .md files; --recursive includes nested .md, excludes .txt, and returns 0 for an empty directory. Metric: local scenario pass rate 100%. I authorize implementation in this isolated sample and creation/removal of synthetic fixtures only inside this workspace. Preserve evidence logs and reports. Use English. First record the selected proposal and both grants, then pause before implementation so I can resume in a fresh session. Do not access the network, install dependencies, read other projects, modify global settings, delegate, publish, commit, or build.\n",
+      "final_response": "Recorded the selected proposal, **100% local scenario target**, and both grants.\n\nPaused before implementation as requested. Product files are unchanged; no scenarios ran or fixtures were created. Logs and reports are preserved.\n\n[Resume instructions](<trial-root>/codex-en/.product-loop/RESUME.md) explain how to continue with the saved grants.\n\n",
+      "reviewed_outcome": "reviewed_pass",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "codex-en",
+      "step": "03-resume",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": -15,
+        "timed_out": true,
+        "elapsed_seconds": 420.03,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Resume the saved Iter cycle in this workspace using the project-installed iterate-product skill. Continue the already-approved optional --recursive feature and its isolated local scenarios through evaluation. Reuse the saved implementation and local-testing grants; the scope and target are unchanged. Use English. Preserve logs and reports. Do not access the network, install dependencies, read other projects, change global settings, delegate, publish, commit, or build.\n",
+      "final_response": null,
+      "reviewed_outcome": "incomplete_time_limit",
+      "model_turn_completed": false
+    },
+    {
+      "workspace_case": "codex-en",
+      "step": "04-resume-development",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 530.38,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Resume the saved Iter cycle in this workspace using the project-installed iterate-product skill. Continue the already-approved optional --recursive feature and its isolated local scenarios through evaluation. Reuse the saved implementation and local-testing grants; the scope and target are unchanged. Use English. Preserve logs and reports. Do not access the network, install dependencies, read other projects, change global settings, delegate, publish, commit, or build.\n",
+      "final_response": "Completed the saved Iter cycle with scope and grants unchanged. `--recursive` now counts nested `.md` files while preserving immediate-only default behavior.\n\nAll five scenarios passed: **100%**, versus the saved 20% baseline. Fixtures were verified and removed; logs and reports were preserved.\n\n[Evaluation report](<trial-root>/codex-en/.product-loop/cycles/20260905-052216/05-evaluation.md)\n\n**Local scenarios passed; real-user value remains unvalidated.**\n\n",
+      "reviewed_outcome": "reviewed_pass",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "codex-zh-CN",
+      "step": "01-selected",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 368.73,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "使用当前项目安装的 iterate-product，为 Note Counter 添加可选 --recursive 参数；默认只统计第一层 .md，递归包含嵌套 .md，排除 .txt，空目录输出0。指标为本机场景通过率100%。我授权修改此隔离样例，并仅在当前临时工作区创建和删除合成测试数据，保留执行日志与报告。用中文完成这一轮。不得访问网络、其他项目或真实用户数据、安装依赖、改全局配置、委派任务、发布、提交或build。\n",
+      "final_response": "已添加 `--recursive`：默认只统计第一层 `.md`，递归包含嵌套 `.md`，排除 `.txt`，空目录输出 `0`。\n\n四个场景、七次 CLI 调用全部通过，指标达到 **100%**。合成数据已清理，Iter 本轮状态为 `complete`，未运行 build。\n\n已保留[评估报告](<trial-root>/codex-zh-CN/.product-loop/cycles/note-counter-recursive/05-evaluation.md)与[执行日志](<trial-root>/codex-zh-CN/.product-loop/evidence/cli.jsonl)。\n\n本机场景验证通过；真实用户价值待验证",
+      "reviewed_outcome": "reviewed_pass",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "codex-revision",
+      "step": "01-revision",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": -15,
+        "timed_out": true,
+        "elapsed_seconds": 180.03,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill and inspect the saved cycle. I now want the count to be recursive by default, with --shallow to keep the old immediate-only behavior. Show the concrete revised proposal and its impact for review before implementing. I have not yet approved this changed scope; the saved grants cover only the earlier optional --recursive behavior. Use English, keep product files unchanged, preserve all reports, and do not use the network, install dependencies, modify global settings, delegate, publish, commit, or build.\n",
+      "final_response": null,
+      "reviewed_outcome": "incomplete_time_limit",
+      "model_turn_completed": false
+    },
+    {
+      "workspace_case": "codex-revision",
+      "step": "02-revision-resume",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": -15,
+        "timed_out": true,
+        "elapsed_seconds": 300.02,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill and inspect the saved cycle. I now want the count to be recursive by default, with --shallow to keep the old immediate-only behavior. Show the concrete revised proposal and its impact for review before implementing. I have not yet approved this changed scope; the saved grants cover only the earlier optional --recursive behavior. Use English, keep product files unchanged, preserve all reports, and do not use the network, install dependencies, modify global settings, delegate, publish, commit, or build.\n",
+      "final_response": null,
+      "reviewed_outcome": "incomplete_time_limit",
+      "model_turn_completed": false
+    },
+    {
+      "workspace_case": "codex-revision",
+      "step": "03-review",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": -15,
+        "timed_out": true,
+        "elapsed_seconds": 240.04,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "The prior session was interrupted after recording the unapproved scope revision. Use iterate-product to resume from the saved revised proposal and existing review files. Present the concrete revision and its approval decision to me, then wait; do not implement or run scenarios. Do not repeat completed research or change the proposed scope again. No network, dependencies, global settings, delegation, publication, commits, or build.\n",
+      "final_response": "The [saved revised proposal](<trial-root>/codex-revision/.product-loop/revised-proposal.json) remains **unapproved**. It matches the existing review record; implementation and revised local testing both await authorization.\n\nThe concrete revision is:\n\n- `python3 count_notes.py <directory>` counts `.md` files recursively, including hidden and generated subdirectories.\n- `--shallow` preserves current immediate-only counting. It replaces the previously planned, unimplemented `--recursive` option; no alias is proposed.\n- Both modes retain exact lowercase `.md` matching, file-only counting, and integer output with a newline; empty directories return `0`.\n- Recursive traversal skips directory symlinks. Existing root and file-symlink behavior remains intact, and traversal errors must surface.\n- Changes cover `count_notes.py`, CLI help, `README.md`, and new `test_count_notes.py`, using Python’s standard library.\n\nI recommend this saved scope because it makes nested-note counting the default while providing an explicit migration path. The tradeoff is a changed CLI contract: existing callers may receive larger counts, slower scans, or nested access errors. Callers needing the old behavior must add `--shallow`.\n\nThe saved validation target is **100% across six actual CLI scenarios**:\n\n| Scenario | Expected result |\n|---|---|\n| Nested Markdown files | Default: `4` |\n| Same tree with `--shallow` | `2`, matching the old default |\n| Nonmatching extensions and directories | Both: `0` |\n| Empty directory | Both: `0` |\n| Symlink handling | Both: `1`; `2` after adding an eligible file symlink |\n| Hidden/generated subdirectories | Default: `3`; shallow: `1` |\n\nTesting would measure the existing CLI baseline, then exercise the revision using synthetic fixtures exclusively under `.product-loop/fixtures/`. Cleanup removes only recorded fixtures, keeping symlink targets inside them and preserving logs and reports. Recovery reverts only scoped product edits. Baseline and results remain unmeasured; real-user value and large-tree performance remain unvalidated.\n\nProduct files match their preserved originals, and all 13 original snapshots are intact. I changed no files, repeated no research, and ran no scenarios.\n\nDo you approve implementation of this saved revision and separately authorize its six local scenarios, including fixture creation and removal?\n\nThe earlier grants cover only optional `--recursive`. The project’s [iterate-product SKILL.md](<trial-root>/codex-revision/.agents/skills/iterate-product/SKILL.md) requires: “If no matching grant exists, present the concrete decision and record the user's response before development.” I’m waiting for your decision.\n\n",
+      "reviewed_outcome": "behavior_observed_model_turn_complete_process_timeout",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "codex-cancel",
+      "step": "01-cancel",
+      "process": {
+        "host": "codex",
+        "version": "codex-cli 0.153.1",
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 156.18,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use iterate-product. Cancel this iteration now: I reject the revised recursive-by-default proposal. Do not implement, test scenarios, or finish phase reports. Keep all existing product files, reports, grants/history, and evidence. Record this decision and end the cycle. No network, dependencies, global settings, delegation, publication, commits, or build.\n",
+      "final_response": "Cancelled the cycle and recorded your rejection as `user_stopped`.\n\nAll existing product files, reports, grants/history, and evidence are preserved. No implementation, scenario testing, or phase-report completion occurred.\n\n",
+      "reviewed_outcome": "reviewed_pass",
+      "model_turn_completed": true
+    },
+    {
+      "workspace_case": "claude-en",
+      "step": "01-open",
+      "process": {
+        "host": "claude",
+        "exit_code": 143,
+        "timed_out": true,
+        "elapsed_seconds": 180.08,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "Use the project-installed iterate-product skill to suggest the next improvement for this Note Counter. Use only this isolated project as evidence. Reply in English. I have not selected a feature or authorized implementation. Do not access the network, install dependencies, use other skills, or modify the product. Present concrete choices and stop for my selection.\n",
+      "final_response": null,
+      "discovered": true,
+      "reported_model": "claude-opus-4-6[1m]",
+      "api_retry_count": 10,
+      "reviewed_outcome": "incomplete_service_errors",
+      "model_turn_completed": false
+    },
+    {
+      "workspace_case": "claude-zh-CN",
+      "step": "01-open",
+      "process": {
+        "host": "claude",
+        "version": "2.1.92 (Claude Code)",
+        "exit_code": 143,
+        "timed_out": true,
+        "elapsed_seconds": 75.05,
+        "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts."
+      },
+      "skill_snapshot_sha256": {
+        "SKILL.md": "f8bfe01cf6c064cb0a9f61ca5d74812b65ce4049e173cd45a0fab7fd315b8682",
+        "scripts/product_loop.py": "4009423488f688cd67b2d8bba529e496acf90899c51785846b291dfddc8681fa"
+      },
+      "prompt": "使用当前项目安装的 iterate-product，为此 Note Counter 给出2–3个具体改进建议。用中文。仅使用当前隔离项目作为证据，我尚未选定功能或授权开发。不要访问网络、安装依赖、修改产品或全局配置、委派任务、发布或build。给出建议后等待我选择。\n",
+      "final_response": null,
+      "discovered": true,
+      "reported_model": "claude-opus-4-6[1m]",
+      "api_retry_count": 8,
+      "reviewed_outcome": "incomplete_service_errors",
+      "model_turn_completed": false
+    }
+  ],
+  "latest_workspace_observations": {
+    "codex-en": {
+      "cycle_id": "20260905-052216",
+      "stage": "complete",
+      "language": "en",
+      "history_events": [
+        "initialized",
+        "stage_advanced",
+        "stage_advanced",
+        "stage_advanced",
+        "approved",
+        "execution_recorded",
+        "stage_advanced",
+        "cycle_completed"
+      ],
+      "grants": {
+        "implementation": {
+          "status": "granted",
+          "at": "2026-09-05T05:22:16+00:00",
+          "scope_digest": "80ca8a3463cfe50605482052af1e08a1f0cf53ba7b3efe931c9393da274cce6f"
+        },
+        "local": {
+          "status": "granted",
+          "at": "2026-09-05T05:22:16+00:00",
+          "scope_digest": "80ca8a3463cfe50605482052af1e08a1f0cf53ba7b3efe931c9393da274cce6f"
+        }
+      },
+      "completion": {
+        "basis": "local_scenario",
+        "real_user_value": "unvalidated"
+      },
+      "execution_status": "passed",
+      "code_sha256": "a09a2d740fe8f559227dd7a13fc599665f9a812a166f70939b50c0e65aeb2adf"
+    },
+    "codex-zh-CN": {
+      "cycle_id": "note-counter-recursive",
+      "stage": "complete",
+      "language": "zh-CN",
+      "history_events": [
+        "initialized",
+        "stage_advanced",
+        "stage_advanced",
+        "stage_advanced",
+        "approved",
+        "execution_recorded",
+        "stage_advanced",
+        "cycle_completed"
+      ],
+      "grants": {
+        "implementation": {
+          "status": "granted",
+          "at": "2026-09-05T05:22:03+00:00",
+          "scope_digest": "017f0eaf538d9d09a998e127860d3d14094220233aa61300a42720e0d973e171"
+        },
+        "local": {
+          "status": "granted",
+          "at": "2026-09-05T05:22:03+00:00",
+          "scope_digest": "017f0eaf538d9d09a998e127860d3d14094220233aa61300a42720e0d973e171"
+        }
+      },
+      "completion": {
+        "basis": "local_scenario",
+        "real_user_value": "unvalidated"
+      },
+      "execution_status": "passed",
+      "code_sha256": "faf990f121a55cd5520af7da539f83efa6981c1d412027cd7798f154faf479c1"
+    },
+    "codex-revision": {
+      "cycle_id": "20260905-052216",
+      "stage": "research",
+      "language": "en",
+      "history_events": [
+        "initialized",
+        "proposal_revised"
+      ],
+      "grants": {},
+      "completion": null,
+      "execution_status": null,
+      "code_sha256": "ac5dbe77928c2bee625b10fe9d1d7011732b63a29eedf000926f59a91339fe48"
+    },
+    "codex-cancel": {
+      "cycle_id": "20260905-052216",
+      "stage": "stopped",
+      "language": "en",
+      "history_events": [
+        "initialized",
+        "proposal_revised",
+        "user_stopped"
+      ],
+      "grants": {},
+      "completion": null,
+      "execution_status": null,
+      "code_sha256": "ac5dbe77928c2bee625b10fe9d1d7011732b63a29eedf000926f59a91339fe48"
+    }
+  },
+  "verified_pause_observation": {
+    "case": "codex-en/02-selected",
+    "stage": "research",
+    "implementation": "granted",
+    "local": "granted",
+    "product_code_unchanged": true,
+    "evidence_executed": false
+  },
+  "final_candidate_sha256": {
+    "SKILL.md": "49dc0574a1b41df8e1e6b23ebf6683e6d34baf325b86cd973e59a791785bfe47",
+    "scripts/product_loop.py": "c04de1a30cbc268e730950fd4ce85d806b39117a114f39d492d38377cc8d9e9e"
+  },
+  "final_candidate_revalidation": {
+    "english_native_evaluation": "passed with final helper against actual artifacts",
+    "chinese_native_evaluation": "passed with final helper against actual artifacts"
+  },
+  "observed_case_results": {
+    "english_open_suggestions": "passed; three choices, waited for selection, no product changes",
+    "english_selected_scope_and_pause": "passed; both grants saved, source unchanged",
+    "english_fresh_session_resume": "passed after a 420-second interrupted attempt and subsequent 530.38-second invocation; completed five scenarios; original grants unchanged; zero repeated authorization questions",
+    "chinese_selected_scope": "passed; complete; four scenarios and seven CLI calls; 368.73 seconds",
+    "scope_revision": "behavior reviewed: previous grants cleared, originals preserved, revised scope and approval question presented. Final model turn completed, but process hit its 240-second deadline; do not count as an unqualified process pass. Earlier attempts timed out at 180 and 300 seconds.",
+    "cancellation": "passed; stopped from unapproved research stage; 30 retained file hashes unchanged; 156.18 seconds",
+    "claude_all_behavior_cases": "incomplete; both open-ended attempts discovered the skill but repeated API HTTP 500 responses prevented model output"
+  }
+}

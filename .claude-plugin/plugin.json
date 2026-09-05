@@ -1,0 +1,12 @@
+{
+  "name": "iter",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Choose a product iteration, deliver the approved scope, and evaluate the result.",
+  "author": {
+    "name": "dongruilin"
+  },
+  "homepage": "https://github.com/drl990114/Iter",
+  "repository": "https://github.com/drl990114/Iter",
+  "skills": "./skills/"
+}

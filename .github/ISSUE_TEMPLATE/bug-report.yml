@@ -1,0 +1,21 @@
+name: Bug report / 问题反馈
+description: Report a reproducible installation or workflow failure / 报告可复现的安装或流程问题
+title: '[Bug] '
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: Iter version, host version, OS, Python / 版本与环境
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result, actual result / 步骤、预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted error or log / 脱敏错误与日志
+      description: Remove credentials, private code, personal paths, and customer data / 移除凭据、私有代码、个人路径和客户数据

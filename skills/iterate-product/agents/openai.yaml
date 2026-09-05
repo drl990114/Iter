@@ -1,0 +1,6 @@
+interface:
+  display_name: "Iter"
+  short_description: "Choose an improvement, deliver it, and verify the result."
+  default_prompt: "Use $iterate-product to start or resume a product iteration, matching my conversation language and reusing the scope I have already authorized."
+policy:
+  allow_implicit_invocation: true

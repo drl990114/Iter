@@ -1,0 +1,71 @@
+name: Trial feedback / 试用反馈
+description: Tell us where your first iteration worked or got stuck / 记录首轮体验与卡点
+title: '[Trial] '
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share only information you choose to make public. Remove credentials, private code, absolute home paths, and customer data from logs.
+        请仅分享愿意公开的信息；日志中移除凭据、私有代码、个人绝对路径和客户数据。
+  - type: input
+    id: environment
+    attributes:
+      label: Host, version, OS / 工具、版本、系统
+      placeholder: 'Codex 0.x / macOS / Node 24 / Python 3.10'
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Iter version and install command / Iter 版本与安装命令
+      placeholder: '0.1.0; npx skills add ... --copy'
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Report language / 报告语言
+      options: [English, 简体中文]
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Intended task and outcome / 原始任务与实际结果
+      description: Include the stage where it got stuck and any repeated permission questions / 说明卡住的阶段及是否重复询问授权
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation outcome / 安装结果
+      options: ['Installed and discovered / 已安装且宿主发现', 'Installed but not discovered / 已安装但宿主未发现', 'Install failed / 安装失败', 'Not attempted / 尚未安装']
+    validations:
+      required: true
+  - type: dropdown
+    id: completed
+    attributes:
+      label: Did the first iteration finish? / 首轮是否完成？
+      options: ['Yes / 是', 'No / 否', 'I cancelled / 我主动取消了']
+    validations:
+      required: true
+  - type: input
+    id: first-value
+    attributes:
+      label: Time to first useful result / 首次有用结果耗时
+      description: A rough estimate is enough; say what you considered useful / 估算即可，请说明什么结果对你有用
+  - type: input
+    id: repeated-approval
+    attributes:
+      label: Repeated authorization questions / 重复授权次数
+      description: Count only questions about the same unchanged scope / 只统计范围未变时的重复询问
+  - type: dropdown
+    id: reuse
+    attributes:
+      label: Would you use it for another iteration? / 下次是否愿意继续使用？
+      options: ['Yes / 愿意', 'Maybe / 不确定', 'No / 不愿意']
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Optional redacted evidence and suggestions / 可选脱敏证据与建议

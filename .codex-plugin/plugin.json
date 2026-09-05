@@ -1,0 +1,33 @@
+{
+  "name": "iter",
+  "version": "0.1.0",
+  "description": "One product iteration skill: propose 2–3 concrete improvements, implement the selected scope, and evaluate with product data or authorized local scenarios.",
+  "author": {
+    "name": "dongruilin"
+  },
+  "keywords": [
+    "product-management",
+    "product-research",
+    "experimentation",
+    "workflow"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Iter",
+    "shortDescription": "Choose an iteration, then deliver and validate its scope.",
+    "longDescription": "A single resumable product workflow for Agent Skills-compatible harnesses. Start with 2–3 concrete choices, reuse explicit authorization, and run isolated local scenarios when user feedback is unavailable. Separate local task success from real-user value.",
+    "developerName": "dongruilin",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Suggest 2–3 concrete improvements for this product, with scope, acceptance criteria, and risks, then let me choose.",
+      "Continue the saved product iteration within my approved scope; ask only when a material decision changes.",
+      "When user feedback is unavailable, propose isolated scenarios to test on my machine and state what the results can establish."
+    ]
+  },
+  "homepage": "https://github.com/drl990114/Iter",
+  "repository": "https://github.com/drl990114/Iter"
+}

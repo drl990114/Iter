@@ -1,0 +1,62 @@
+[before / default] $ python3 count_notes.py <fixtures>/tree
+exit=0; expected=2
+2
+
+
+[before / recursive] $ python3 count_notes.py --recursive <fixtures>/tree
+exit=2; expected=4
+
+usage: count_notes.py [-h] directory
+count_notes.py: error: unrecognized arguments: --recursive
+
+[before / exclude] $ python3 count_notes.py <fixtures>/non-markdown
+exit=0; expected=0
+0
+
+
+[before / exclude] $ python3 count_notes.py --recursive <fixtures>/non-markdown
+exit=2; expected=0
+
+usage: count_notes.py [-h] directory
+count_notes.py: error: unrecognized arguments: --recursive
+
+[before / empty] $ python3 count_notes.py <fixtures>/empty
+exit=0; expected=0
+0
+
+
+[before / empty] $ python3 count_notes.py --recursive <fixtures>/empty
+exit=2; expected=0
+
+usage: count_notes.py [-h] directory
+count_notes.py: error: unrecognized arguments: --recursive
+
+[after / default] $ python3 count_notes.py <fixtures>/tree
+exit=0; expected=2
+2
+
+
+[after / recursive] $ python3 count_notes.py --recursive <fixtures>/tree
+exit=0; expected=4
+4
+
+
+[after / exclude] $ python3 count_notes.py <fixtures>/non-markdown
+exit=0; expected=0
+0
+
+
+[after / exclude] $ python3 count_notes.py --recursive <fixtures>/non-markdown
+exit=0; expected=0
+0
+
+
+[after / empty] $ python3 count_notes.py <fixtures>/empty
+exit=0; expected=0
+0
+
+
+[after / empty] $ python3 count_notes.py --recursive <fixtures>/empty
+exit=0; expected=0
+0
+

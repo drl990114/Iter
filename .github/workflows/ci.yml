@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        default: ''
+      candidate_sha:
+        type: string
+        default: ''
+      candidate_artifact_id:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: '22.20.0'
+            python: '3.10'
+          - os: ubuntu-latest
+            node: '24'
+            python: '3.13'
+          - os: macos-latest
+            node: '24'
+            python: '3.10'
+          - os: windows-latest
+            node: '24'
+            python: '3.10'
+    env:
+      DISABLE_TELEMETRY: '1'
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
+      - if: inputs.candidate_artifact_id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ inputs.candidate_artifact_id }}
+          path: ${{ runner.temp }}/release-candidate
+          merge-multiple: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Restore the release candidate
+        if: inputs.candidate_artifact_id != ''
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: node scripts/release.mjs restore --candidate "$RUNNER_TEMP/release-candidate" --sha "$CANDIDATE_SHA"
+        shell: bash
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: python -m pip install ruff==0.16.6
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:install
+      - run: npm run test:python
+      - run: python -m ruff check skills/iterate-product/scripts scripts
+      - run: python -m ruff format --check skills/iterate-product/scripts scripts
+      - run: git diff --exit-code
+
+# Native model sessions are opt-in local checks. This workflow uses no model
+# credentials and does not publish, tag, or change repository visibility.

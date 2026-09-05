@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-05T05:27:14+00:00",
+  "kind": "independent_cli_replay",
+  "python": "3.10.10",
+  "os": "Darwin",
+  "sources": {
+    "before": {
+      "path": "examples/note-counter/count_notes.py",
+      "sha256": "ac5dbe77928c2bee625b10fe9d1d7011732b63a29eedf000926f59a91339fe48"
+    },
+    "after": {
+      "path": "examples/note-counter-completed/count_notes.py",
+      "sha256": "faf990f121a55cd5520af7da539f83efa6981c1d412027cd7798f154faf479c1"
+    }
+  },
+  "summary": {
+    "before": {
+      "scenarios": {
+        "default": true,
+        "recursive": false,
+        "exclude": false,
+        "empty": false
+      },
+      "passed": 1,
+      "total": 4
+    },
+    "after": {
+      "scenarios": {
+        "default": true,
+        "recursive": true,
+        "exclude": true,
+        "empty": true
+      },
+      "passed": 4,
+      "total": 4
+    }
+  },
+  "observations": [
+    {
+      "revision": "before",
+      "scenario": "default",
+      "command": "python3 count_notes.py <fixtures>/tree",
+      "expected": "2",
+      "exit_code": 0,
+      "stdout": "2\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "before",
+      "scenario": "recursive",
+      "command": "python3 count_notes.py --recursive <fixtures>/tree",
+      "expected": "4",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "usage: count_notes.py [-h] directory\ncount_notes.py: error: unrecognized arguments: --recursive\n",
+      "passed": false
+    },
+    {
+      "revision": "before",
+      "scenario": "exclude",
+      "command": "python3 count_notes.py <fixtures>/non-markdown",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "before",
+      "scenario": "exclude",
+      "command": "python3 count_notes.py --recursive <fixtures>/non-markdown",
+      "expected": "0",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "usage: count_notes.py [-h] directory\ncount_notes.py: error: unrecognized arguments: --recursive\n",
+      "passed": false
+    },
+    {
+      "revision": "before",
+      "scenario": "empty",
+      "command": "python3 count_notes.py <fixtures>/empty",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "before",
+      "scenario": "empty",
+      "command": "python3 count_notes.py --recursive <fixtures>/empty",
+      "expected": "0",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "usage: count_notes.py [-h] directory\ncount_notes.py: error: unrecognized arguments: --recursive\n",
+      "passed": false
+    },
+    {
+      "revision": "after",
+      "scenario": "default",
+      "command": "python3 count_notes.py <fixtures>/tree",
+      "expected": "2",
+      "exit_code": 0,
+      "stdout": "2\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "after",
+      "scenario": "recursive",
+      "command": "python3 count_notes.py --recursive <fixtures>/tree",
+      "expected": "4",
+      "exit_code": 0,
+      "stdout": "4\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "after",
+      "scenario": "exclude",
+      "command": "python3 count_notes.py <fixtures>/non-markdown",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "after",
+      "scenario": "exclude",
+      "command": "python3 count_notes.py --recursive <fixtures>/non-markdown",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "after",
+      "scenario": "empty",
+      "command": "python3 count_notes.py <fixtures>/empty",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "revision": "after",
+      "scenario": "empty",
+      "command": "python3 count_notes.py --recursive <fixtures>/empty",
+      "expected": "0",
+      "exit_code": 0,
+      "stdout": "0\n",
+      "stderr": "",
+      "passed": true
+    }
+  ],
+  "synthetic_fixtures_removed": true,
+  "limitation": "Local scenarios passed; real-user value remains unvalidated."
+}
