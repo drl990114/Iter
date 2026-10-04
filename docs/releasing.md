@@ -16,7 +16,7 @@ npm run release
 2. 在 runner 中创建候选提交，通过 Git bundle 把同一份提交交给 Linux、macOS、Windows 的现有 CI 检查。最低 Node/Python 版本也在矩阵内，无需 build。
 3. 全部检查通过后，原子推送版本提交与 `v<version>` tag，把本次矩阵结果记录到候选 SHA 的 `Release / candidate CI` 状态，再创建 GitHub Release。该状态链接回完整检查记录；含预发布后缀的版本自动标记为 Pre-release。
 
-只有第 3 步会写入远端。普通 push/PR 只运行 CI；README 不加入版本更新范围。包和插件共用产品版本，`.product-loop` 状态结构版本独立维护。此流程不发布 npm、不改变仓库可见性，也不向其他人发送消息。
+只有第 3 步会写入远端。普通 push/PR 只运行 CI；README 不加入版本更新范围。包和插件共用产品版本，外置流程状态的 schema 版本独立维护；旧 `.product-loop/` 的升级见[存储迁移说明](storage.md)。此流程不发布 npm、不改变仓库可见性，也不向其他人发送消息。
 
 ### 版本选择
 
@@ -55,6 +55,8 @@ Merge and push your changes to `main`, then select **Actions → Release → Run
 Release preparation uses release-it, its bumper plugin, and Conventional Changelog. It synchronizes the package, lockfile, and both plugin manifests, combines the curated `Unreleased` notes with generated commit notes, and creates a local candidate commit. A Git bundle carries that exact commit through the existing Linux, macOS, Windows, and minimum-runtime CI matrix. No build is required.
 
 Only after every check succeeds does the workflow atomically push the version commit and its `v<version>` tag, attach a `Release / candidate CI` status to that exact SHA linking to the completed matrix run, then create a GitHub Release. SemVer prereleases are marked as GitHub pre-releases. Ordinary pushes and PRs only run CI. README stays independent of product versions, and workflow state schema versions remain separate. npm publishing, repository visibility, and external messages are outside this workflow.
+
+Current workflow state uses external storage. Include the [storage migration guide](storage.en.md) when releasing the schema-2 change so existing `.product-loop/` cycles are migrated explicitly and their backups retained.
 
 | Mode | Behavior |
 |---|---|

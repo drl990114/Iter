@@ -11,7 +11,7 @@ Own the iteration from a useful choice to an evidence-backed result. This is one
 ## Start with a useful choice
 
 1. Locate the workspace and read applicable repository instructions. Inspect the product, relevant implementation, available tests, and applicable open-source options. Without a Git root, use the user's workspace directory.
-2. If `.product-loop/state.json` exists, run `status`. Resume an active cycle without replacing its objective or repeating the menu. For a terminal cycle, report the result unless the user explicitly asks to start another iteration; then present fresh choices and use `init --new-cycle` after selection, preserving the old cycle.
+2. Run `paths --workspace "<workspace>"` and `status` using the loaded helper. These reads do not create storage; `status` reports `exists: false` when no external state exists. If `migration_required` is true, handle the legacy cycle with explicit `migrate` before continuing; do not initialize over it. Resume an active cycle without replacing its objective or repeating the menu. For a terminal cycle, report the result unless the user explicitly asks to start another iteration; then present fresh choices and use `init --new-cycle` after selection, preserving the old cycle.
 3. For a new open-ended iteration, do a lightweight repository review and present **2–3 concrete feature improvements** before an exhaustive market survey. Each needs a user benefit, observed problem, smallest scope, metric/acceptance, validation method, main risk, and tradeoff. Recommend one with a reason; mark unmeasured baselines and assumptions honestly.
 4. If the user specified a feature, focus on it instead of inventing alternatives. An under-specified direction authorizes investigation, not an unpresented implementation scope.
 5. For a new choice, explain that selection authorizes its listed implementation scope. Describe proposed local scenarios, data scope, possible changes, and recovery. Reuse authorization already given in the user's request or conversation; ask only for a missing permission or a material change. Implementation and local testing are separate grants that can be answered together.
@@ -24,8 +24,11 @@ Do not require five users, a fixed participant count, or participant recruitment
 Resolve `<skill-dir>` to this loaded skill's directory, not the workspace or a cached absolute path. Keep its `scripts`, `references`, and `assets` together. Use the host's available file, shell, browser, and user-question tools; a plain conversation question works without a dedicated question tool. Python 3.10+ runs the helper with no third-party packages. Use the available Python command (`python3`, `python`, or Windows `py -3`), verify its version, and quote paths. Node.js is needed only for optional installation tooling or the DeepSeek adapter. If a capability is missing, finish independent work and identify the precise remaining need.
 
 ```sh
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<workspace>"
 python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
 ```
+
+Use the returned `storage_root`, `state_path`, `inputs_dir`, and `evidence_dir`; do not construct them from the project name or create `.product-loop/`. Storage defaults to `~/.iter`, or an absolute external `ITER_HOME`, and is isolated by the resolved workspace path. Save proposal/execution JSON in `inputs_dir` and generated logs in `evidence_dir`; keep existing user evidence in place. Obtain the host's required write access to this exact `storage_root`, reusing existing permissions where applicable. If access is unavailable, report the path and blocker without falling back to project storage. Migration, schema version 2, and `relocate` after a workspace move are described in [state-schema.md](references/state-schema.md).
 
 Read [workflow-contract.md](references/workflow-contract.md) and the current phase guide, produce its artifact, validate, advance, and immediately continue in the same invocation:
 

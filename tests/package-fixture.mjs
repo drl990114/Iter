@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, mkdir, readFile, readdir, realpath } from 'node:fs/promises';
+import { isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extract } from 'tar';
 
@@ -52,22 +52,42 @@ export function pythonCommand() {
   throw new Error('Python 3.10+ is required for skill installation smoke tests.');
 }
 
-export async function assertInstalledHelperWorks(skillDirectory, workspace, cwd) {
-  await mkdir(workspace, { recursive: true });
+export function helperCommand(skillDirectory, workspace, iterHome, args, cwd = workspace) {
+  assert.ok(isAbsolute(iterHome), 'Tests must use an explicit absolute temporary ITER_HOME.');
   const python = pythonCommand();
   const helper = join(skillDirectory, 'scripts/product_loop.py');
-  execFileSync(python.command, [...python.args, helper, 'init', '--workspace', workspace,
-    '--objective', 'Check portable skill resources', '--metric', 'Local installation success'], {
+  return JSON.parse(execFileSync(python.command, [...python.args, helper, ...args, '--workspace', workspace], {
     cwd, encoding: 'utf8', timeout: 10_000,
-  });
-  const state = JSON.parse(await readFile(join(workspace, '.product-loop/state.json'), 'utf8'));
+    env: { ...process.env, ITER_HOME: iterHome, PYTHONDONTWRITEBYTECODE: '1' },
+  }));
+}
+
+export async function assertInstalledHelperWorks(skillDirectory, workspace, cwd, iterHome) {
+  await mkdir(workspace, { recursive: true });
+  await mkdir(iterHome, { recursive: true });
+  const paths = helperCommand(skillDirectory, workspace, iterHome, ['paths'], cwd);
+  assert.equal(paths.iter_home, await realpath(iterHome));
+  assert.equal(paths.exists, false);
+  assert.equal(paths.legacy_exists, false);
+  assert.equal(paths.migration_required, false);
+  const storageRelative = relative(paths.iter_home, paths.storage_root);
+  assert.ok(storageRelative && !storageRelative.startsWith('..') && !isAbsolute(storageRelative));
+  await assert.rejects(access(paths.storage_root), { code: 'ENOENT' });
+  helperCommand(skillDirectory, workspace, iterHome, ['init',
+    '--objective', 'Check portable skill resources', '--metric', 'Local installation success'], cwd);
+  const state = JSON.parse(await readFile(paths.state_path, 'utf8'));
+  assert.equal(state.schema_version, 2);
   assert.equal(state.stage, 'research');
   assert.equal(state.objective, 'Check portable skill resources');
   for (const path of Object.values(state.artifacts)) {
-    assert.ok((await readFile(join(workspace, path), 'utf8')).length > 0, `Missing generated artifact ${path}`);
+    assert.ok(!isAbsolute(path) && !path.includes('.product-loop'));
+    assert.ok((await readFile(join(paths.storage_root, path), 'utf8')).length > 0, `Missing generated artifact ${path}`);
   }
-  const status = execFileSync(python.command, [...python.args, helper, 'status', '--workspace', workspace], {
-    cwd, encoding: 'utf8', timeout: 10_000,
-  });
-  assert.match(status, /research/);
+  const status = helperCommand(skillDirectory, workspace, iterHome, ['status'], cwd);
+  assert.equal(status.stage, 'research');
+  assert.equal(status.storage_root, paths.storage_root);
+  assert.equal(status.state_path, paths.state_path);
+  assert.equal(helperCommand(skillDirectory, workspace, iterHome, ['paths'], cwd).exists, true);
+  await assert.rejects(access(join(workspace, '.product-loop')), { code: 'ENOENT' });
+  return paths;
 }

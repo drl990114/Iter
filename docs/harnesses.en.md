@@ -60,7 +60,18 @@ Copy-Item -Recurse $iterSource $iterTarget
 py -3 "$iterTarget\scripts\product_loop.py" --help
 ```
 
-For Claude, use `.claude\skills\iterate-product`. The Skills CLI commands also work in PowerShell. WSL uses its own installation and home directories. Prefer workspace-relative evidence paths when sharing reports between operating systems.
+For Claude, use `.claude\skills\iterate-product`. The Skills CLI commands also work in PowerShell. WSL uses its own installation and home directories. Existing workspace evidence can use `workspace:` references; generated evidence lives in the external storage described below.
+
+## Workflow storage
+
+Skill installation paths above are separate from runtime data. State, reports, proposal/execution inputs, and generated evidence default to `~/.iter`, with isolated storage for each resolved workspace path. `ITER_HOME` can select an absolute directory outside the workspace. Query the loaded helper before writing:
+
+```sh
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<workspace>"
+python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
+```
+
+These commands are read-only; empty `status` reports `exists: false`. The host needs write access to the returned `storage_root`. If that access is missing, use its normal permission mechanism for this directory; Iter does not fall back to project files. See [storage and migration](storage.en.md) for input/evidence locations, legacy cycles, and `relocate` after a workspace move.
 
 ## Native plugins
 
@@ -86,14 +97,16 @@ Choose your existing profile. The adapter registers an independent provider and 
 
 ## Migration
 
-Keep `.product-loop/` and any evidence files. Install `iterate-product` first, remove the old `run-product-loop` through its original installer and scope, then start a new session. For a project installed with Skills CLI in Codex:
+Keep legacy `.product-loop/` and evidence files until the explicit storage migration has succeeded. Install `iterate-product` first, remove the old `run-product-loop` through its original installer and scope, then start a new session. For a project installed with Skills CLI in Codex:
 
 ```sh
 npx skills add drl990114/Iter --skill iterate-product --agent codex --copy
 npx skills remove run-product-loop
 ```
 
-The removal above targets only the old skill name across this project's hosts. Use it when migrating all project copies: `.agents/skills` can be shared, so removing only for Codex may retain a copy used by another detected host. Do not use `remove --all`, which selects unrelated skills. For a global installation add `--global` to the matching commands. Use the native plugin manager for plugin installations; do not delete plugin caches manually. Inspect local edits before replacing an installed skill. After upgrading, run the loaded helper's `status` against the existing workspace. Missing `language` is interpreted as Chinese; existing grants and evidence are preserved.
+The removal above targets only the old skill name across this project's hosts. Use it when migrating all project copies: `.agents/skills` can be shared, so removing only for Codex may retain a copy used by another detected host. Do not use `remove --all`, which selects unrelated skills. For a global installation add `--global` to the matching commands. Use the native plugin manager for plugin installations; do not delete plugin caches manually. Inspect local edits before replacing an installed skill.
+
+After upgrading, run the loaded helper's `paths` and `status` against the existing workspace. If `migration_required` is true, use `migrate --workspace "<workspace>"` as described in the [migration guide](storage.en.md#migrate-an-existing-cycle), then inspect the external state and backup. The migration retains grants, report text, and existing evidence references; missing `language` remains Chinese. A name-only reinstall does not perform storage migration automatically.
 
 ## Update, remove, and diagnose
 
@@ -113,6 +126,9 @@ Inspect the update's scope prompt. Native plugin updates require both a refreshe
 | Installed but not discovered | Check host directory, workspace, scope, version, and restart the session |
 | Old or duplicated skill name | Inspect project, personal, and plugin copies; remove the old installation through its manager |
 | Helper/template missing | Copy the whole skill directory |
+| External storage is not writable | Use `paths` to identify the exact `storage_root` and grant host access; do not write workflow files into the project |
+| Legacy cycle needs migration | Run explicit `migrate` before resuming; retain the reported external backup |
+| State appears missing after moving a project | Use explicit `relocate --workspace "<new>" --from "<old>"` after confirming the old workspace path no longer exists |
 | Python missing | Check Python 3.10+ in the host's actual shell; Windows may use `py -3` |
 | Model rejects CLI version | Use a compatible CLI; a model/API failure does not establish skill behavior |
 | Report cannot complete | Run `validate`; retain actual evidence and use the saved report language |

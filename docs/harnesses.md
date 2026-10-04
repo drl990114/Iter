@@ -265,16 +265,29 @@ JSON 中的相对路径继续使用 `./plugins/iter`。使用 WSL 时，在 WSL 
 
 默认 filesystem provider 只发现技能根目录的直接子目录。因此不要把整个 Iter 仓库放进 `.dsh/skills/Iter/`，让真正的 Skill 多嵌套两层。源码与配置以[官方实现](https://github.com/deepseek-ai/deepseek-harness/blob/76fda729799fe9b3848dbe2c211d4b231032b81e/packages/skill/skill-filesystem/README.md)为准。
 
+## 流程存储与权限
+
+Skill 安装目录与运行数据分开。状态、报告、方案与执行输入、生成证据默认保存在项目外的 `~/.iter`，按工作区真实路径隔离。可用绝对外置目录 `ITER_HOME` 覆盖根目录。写入前从实际加载的 Skill 运行：
+
+```sh
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<workspace>"
+python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
+```
+
+上述查询均为只读；没有外置状态时 `status` 返回 `exists: false`。宿主需要返回的准确 `storage_root` 的写权限，缺少时通过宿主权限机制处理，不回退到项目文件。输入与证据位置、旧周期迁移，以及工作区搬家后的 `relocate`，见[存储与迁移说明](storage.md)。
+
 ## 旧名称迁移
 
-保留目标项目的 `.product-loop/` 和证据文件。先安装 `iterate-product`，再按旧副本的原安装方式与作用域移除 `run-product-loop`。Skills CLI 项目安装的 Codex 示例：
+显式存储迁移成功前，保留目标项目的旧 `.product-loop/` 和证据文件。先安装 `iterate-product`，再按旧副本的原安装方式与作用域移除 `run-product-loop`。Skills CLI 项目安装的 Codex 示例：
 
 ```sh
 npx skills add drl990114/Iter --skill iterate-product --agent codex --copy
 npx skills remove run-product-loop
 ```
 
-上述卸载仅移除当前项目所有工具中的旧名称，适用于一起迁移项目副本；共享 `.agents/skills` 时，只指定 Codex 可能因其他工具仍使用而保留旧副本。不要使用会选中其他技能的 `remove --all`。个人安装匹配 `--global`；插件安装用原插件管理器处理。替换前检查安装副本内的本地修改，不直接清理插件缓存。重新打开会话并运行实际加载 helper 的 `status`，核对旧周期与授权保留。缺少 `language` 的旧状态继续按中文解释，无需手动迁移。
+上述卸载仅移除当前项目所有工具中的旧名称，适用于一起迁移项目副本；共享 `.agents/skills` 时，只指定 Codex 可能因其他工具仍使用而保留旧副本。不要使用会选中其他技能的 `remove --all`。个人安装匹配 `--global`；插件安装用原插件管理器处理。替换前检查安装副本内的本地修改，不直接清理插件缓存。
+
+重新打开会话并运行实际加载 helper 的 `paths` 和 `status`。若 `migration_required` 为 true，按[存储迁移说明](storage.md#迁移已有周期)执行 `migrate --workspace "<workspace>"`，再核对外置状态与备份。迁移保留旧周期、授权、报告正文和证据引用；缺少 `language` 的旧状态继续按中文解释。只重装或更名 Skill 不会自动搬迁旧状态。
 
 ## 插件更新与卸载
 
@@ -317,6 +330,9 @@ python3 "/actual/loaded/path/iterate-product/scripts/product_loop.py" --help
 | Codex / Claude 提示找不到 marketplace | 仓库根目录没有 marketplace；按[原生插件安装](#原生插件安装)在独立目录创建对应清单，再添加该目录 |
 | `iter@iter-local` 不存在 | 确认配置已添加、marketplace 名是 `iter-local`、`source` 指向包含插件 manifest 的 `plugins/iter` |
 | 模板或脚本缺失 | 重新复制完整 Skill，保留相对目录结构 |
+| 外置目录无法写入 | 用 `paths` 查询准确的 `storage_root` 并授予宿主访问权限，不把流程文件写回项目 |
+| 旧周期要求迁移 | 先显式运行 `migrate`，保留返回的外置备份，再恢复周期 |
+| 移动项目后状态看似丢失 | 确认旧工作区路径已不存在，再执行 `relocate --workspace "<new>" --from "<old>"` |
 | Python 找不到或版本过低 | 安装 Python 3.10+；让 harness 的实际 shell 能找到它，Windows 可用 `py -3` |
 | 远程环境不能发现本机安装 | 在远程执行环境安装，或将项目 Skill 随代码共享 |
 | 插件更新后仍用旧流程 | 检查版本、市场来源、安装副本及是否已重开会话 |

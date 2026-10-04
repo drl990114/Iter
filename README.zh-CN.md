@@ -38,7 +38,7 @@ npx skills add /absolute/path/to/Iter --skill iterate-product --copy
 
 可以直接用自然语言指定 `iterate-product`。
 
-报告语言跟随当前对话；旧中文周期无需迁移。直接使用 Python CLI 新建周期时，默认英文，可传 `--language zh-CN`。
+报告语言跟随当前对话；旧中文周期在迁移存储后保留原语言。直接使用 Python CLI 新建周期时，默认英文，可传 `--language zh-CN`。
 
 ### 探索下一步
 
@@ -59,7 +59,9 @@ npx skills add /absolute/path/to/Iter --skill iterate-product --copy
 使用 iterate-product，继续保存的产品迭代，在已批准的范围内推进，只在实质决策变化时问我。
 ```
 
-状态保存在目标项目的 `.product-loop/state.json`，报告保存在 cycle 目录；已授权事项会被复用，发布、对外沟通和破坏性操作仍需相应授权。
+状态、报告、方案输入和生成的证据默认保存在项目外的 `~/.iter`，按工作区真实路径分别存储。可将 `ITER_HOME` 设置为工作区之外的绝对目录，覆盖默认根目录。helper 的只读命令 `paths --workspace <路径>` 可在初始化前返回准确位置；项目源码和已有证据仍留在原处。
+
+宿主需要当前工作区 `storage_root` 的写权限；无法写入时不会回退到项目目录。旧 `.product-loop/` 周期需显式 `migrate`，移动工作区后用 `relocate` 重关联，详见[存储与迁移说明](docs/storage.md)。范围不变时继续复用已保存的授权；发布、对外沟通和破坏性操作仍需相应授权。
 
 ### 取消或暂停
 
@@ -73,5 +75,6 @@ npx skills add /absolute/path/to/Iter --skill iterate-product --copy
 
 - [工具适配与排障](docs/harnesses.md)：支持的工具、原生插件、目录与安装问题。
 - [开发验证与试用](docs/testing.md)：自动检查和可复现的本机样例。
+- [存储、迁移与工作区移动](docs/storage.md)：外置目录、宿主权限、旧周期迁移和路径重关联。
 - [发布流程](docs/releasing.md#中文)：手动触发，自动校验、更新版本与发布。
 - [变更记录](CHANGELOG.md) · [发布记录](https://github.com/drl990114/Iter/releases) · [MIT 许可](LICENSE)

@@ -2,9 +2,53 @@
 
 CLI JSON escapes Unicode for reliable non-UTF-8 pipes, including Windows. JSON decoding restores the original text; Markdown and state files use UTF-8.
 
-The helper is `scripts/product_loop.py` inside the loaded skill directory. It uses Python 3.10+ and the standard library. `.product-loop/state.json` remains schema version `1`, with the existing stages, artifact names, metric object, round budget, and decision log. Old states without a validation contract default to `product_metric`; a missing `language` means `zh-CN`.
+The helper is `scripts/product_loop.py` inside the loaded skill directory. It uses Python 3.10+ and the standard library. External state uses schema version `2`, retaining the existing stages, artifact names, metric object, round budget, and decision log. Old states without a validation contract default to `product_metric`; a missing `language` means `zh-CN`.
 
-The agent prepares the JSON from the user's plain-language choice. Never ask the user to fill in a state file or approve raw JSON. Keep proposal and evidence input files in the workspace so decisions remain reviewable; generated cycle artifacts are the durable execution record.
+The agent prepares the JSON from the user's plain-language choice. Never ask the user to fill in a state file or approve raw JSON. Store proposal and execution inputs in the returned external `inputs_dir`; generated cycle artifacts are the durable execution record. Existing user evidence and product files stay at their original locations.
+
+## Storage discovery and access
+
+```sh
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<workspace>"
+python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
+```
+
+These reads do not create directories. `paths` returns:
+
+| Field | Meaning |
+|---|---|
+| `iter_home` | `~/.iter` by default; `ITER_HOME` may select an absolute directory outside the workspace |
+| `storage_root` | Storage isolated by a hash of the resolved workspace path |
+| `state_path` | Schema-2 state file and the sole current phase pointer |
+| `inputs_dir` | Directory for agent-generated proposal and execution JSON |
+| `evidence_dir` | Directory for generated logs and other execution evidence |
+| `exists` | Whether external state exists |
+| `legacy_exists` | Whether the workspace has a legacy `.product-loop/` directory |
+| `migration_required` | Whether the legacy state must be migrated before continuing |
+
+Before initialization, `inputs_dir` and `evidence_dir` are under `storage_root`, so the agent can prepare a proposal without writing into the project. After initialization, paths point into the current cycle; query again after initialization or a new round. Use returned paths instead of reproducing the hash/layout. With no external state, `status` returns `exists: false`; inspect the migration flags before treating this as a new workspace.
+
+The host needs write access to the exact `storage_root`, including when preparing proposal inputs. Reuse existing host permissions; request the necessary directory access only if absent. Do not request all of the home directory or fall back to `.product-loop/`, project-root JSON, or project logs. If the host cannot grant access, identify the required path and stop dependent writes. Setting `ITER_HOME` chooses storage; it does not grant permission. Use the same value in subsequent sessions.
+
+## Legacy migration and workspace moves
+
+For an explicitly requested storage upgrade, discover paths and pause or finish sessions that can still write the old `.product-loop/`, including older Skill sessions. Do not migrate while another writer is active. Then run:
+
+```sh
+python3 "<skill-dir>/scripts/product_loop.py" migrate --workspace "<workspace>"
+python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
+```
+
+Migration validates the legacy `.product-loop/` state, preserves its workflow artifacts and an external backup returned as `backup_path`, writes schema-2 external state, and removes the old workflow directory only after successful migration. Do not remove the legacy directory by hand, initialize a replacement cycle, or overwrite a conflicting external state. After interruption, rerun the same command with the same workspace and `ITER_HOME`; the helper verifies its transaction and target before resuming cleanup. Preserve conflicts for inspection instead of deleting transaction files. Ordinary workflow writes reject pending transactions. Migration preserves grants, proposal digests, report bodies, and old language semantics. Legacy `.product-loop/...` references and absolute paths to the old managed storage resolve through saved path metadata. Referenced user evidence elsewhere in the workspace is not moved.
+
+Different resolved workspace paths have independent storage, including separate clones and worktrees. Before moving, record the old `storage_root`; after moving, use `paths` for the new workspace. Relocation requires the host's permission to transfer data between both exact storage locations, beyond ordinary writes to the new root alone. Reconnect the moved or renamed workspace explicitly:
+
+```sh
+python3 "<skill-dir>/scripts/product_loop.py" relocate --workspace "<new-workspace>" --from "<old-workspace>"
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<new-workspace>"
+```
+
+Pause active sessions before moving the workspace; finish any pending migration first. The old workspace path must no longer exist. `relocate` does not merge two existing clones or infer ownership from a project name. After interruption, rerun the same `relocate` command with the same source, destination, and `ITER_HOME`; the saved transaction verifies ownership before completion. Preserve storage backups and inspect conflicts; do not hand-edit hashes or state to attach an unrelated project. A location-only change keeps grants and report text intact. If moving changes the authorized data operations, scope, risks, or validation contract, use `revise` before further execution; relocation does not authorize those changes.
 
 ## Chosen proposal
 
@@ -43,7 +87,8 @@ The authorization boundary covers the selected ID, objective, scope, acceptance,
 After a real user selection and both permissions, initialize and record them together:
 
 ```sh
-python3 "<skill-dir>/scripts/product_loop.py" init --workspace "<workspace>" --language en --proposal "<proposal.json>" --authorize-implementation --authorize-local --actor user --authorization-evidence "User selected option A and approved its isolated local scenarios"
+python3 "<skill-dir>/scripts/product_loop.py" init --workspace "<workspace>" --language en --proposal "<inputs_dir>/proposal.json" --authorize-implementation --authorize-local --actor user --authorization-evidence "User selected option A and approved its isolated local scenarios"
+python3 "<skill-dir>/scripts/product_loop.py" paths --workspace "<workspace>"
 python3 "<skill-dir>/scripts/product_loop.py" status --workspace "<workspace>"
 ```
 
@@ -51,7 +96,7 @@ Omit either authorization flag if that permission was not granted. `--authorizat
 
 Legacy `init --workspace ... --objective ... --metric ...` remains available; add `--target` for a measurable completion criterion. It does not invent a selected proposal or local authorization. Active state is resumed rather than overwritten. If the user explicitly requests another iteration after `complete`/`stopped`, use `init --new-cycle` with the new selected proposal and grants. This archives the old state and preserves old artifacts and the decision log; it is rejected for an active cycle. Do not use `--force` as a normal restart path. A legacy cycle still needs real metric evidence to complete; missing old targets require an explicit revision rather than invented success.
 
-`--language en|zh-CN` selects report templates for a new cycle; the CLI defaults to `en`. The skill passes the conversation language explicitly. Revisions and automatic rounds retain the saved language. Language is presentation metadata outside the authorization digest; do not revise product scope to translate a report. Existing Chinese states and artifacts need no migration.
+`--language en|zh-CN` selects report templates for a new cycle; the CLI defaults to `en`. The skill passes the conversation language explicitly. Revisions and automatic rounds retain the saved language. Language is presentation metadata outside the authorization digest; do not revise product scope to translate a report. Storage migration keeps existing Chinese states and artifacts in their original language.
 
 Status exposes the current phase, selected proposal, validation mode and evidence state, grants, `language`, and `local_completion_limit` (null for product metrics). Every active phase points to `iterate-product`; terminal phases have no next skill.
 
@@ -78,7 +123,7 @@ The same command accepts `--authorize-implementation` and `--authorization-scope
 For a material change, show the revised scope/metric/acceptance/risk and record the user's decision with the new proposal:
 
 ```sh
-python3 "<skill-dir>/scripts/product_loop.py" revise --workspace "<workspace>" --proposal "<revised-proposal.json>" --rationale "Replace unavailable user-conversion measurement with the explicitly approved local task experiment" --authorize-implementation --authorize-local --actor user --authorization-evidence "User approved the revised local metric and isolated tests"
+python3 "<skill-dir>/scripts/product_loop.py" revise --workspace "<workspace>" --proposal "<inputs_dir>/revised-proposal.json" --rationale "Replace unavailable user-conversion measurement with the explicitly approved local task experiment" --authorize-implementation --authorize-local --actor user --authorization-evidence "User approved the revised local metric and isolated tests"
 ```
 
 A material revision snapshots prior artifacts under the current cycle’s `revisions/` directory and retains the prior contract in decision history, updates metric/validation consistently, invalidates mismatched grants, and clears inapplicable results. Affected current-stage and downstream artifacts are reset for the new contract so old text cannot pass unchanged. A cycle already at approval, development, or evaluation returns to experiment to update its decision packet; earlier stages continue in place. Changing the selected opportunity returns to differentiation unless research is still current, so the saved choice and opportunity artifact stay consistent. Revisions cannot silently downgrade an approved product metric. A missing grant remains pending and must not be replaced with a fabricated approval.
@@ -110,17 +155,19 @@ An approved local plan can have pending baseline/results during research. Actual
       "scenario_id": "empty-workspace",
       "status": "passed",
       "observed": "Keyboard and pointer each opened and completed the existing creation flow",
-      "evidence_refs": ["evidence/first-task.log"]
+      "evidence_refs": ["<evidence_dir>/first-task.log"]
     }
   ]
 }
 ```
 
 ```sh
-python3 "<skill-dir>/scripts/product_loop.py" evidence --workspace "<workspace>" --input "<execution.json>"
+python3 "<skill-dir>/scripts/product_loop.py" evidence --workspace "<workspace>" --input "<inputs_dir>/execution.json"
 ```
 
-References point to actual evidence, not desired outputs. Prefer workspace-relative paths for portable reports; native absolute paths, Windows drive/UNC paths, spaces, and optional `:line:column` or `#fragment` suffixes are supported. Retain the files through evaluation. A top-level `evidence_refs` list can support aggregate product metrics. The helper binds records to the current cycle and proposal digest and rejects explicitly stale bindings.
+Replace `<evidence_dir>` with the absolute directory returned by `paths`; it is not a literal path. References point to actual evidence, not desired outputs. Generate new evidence there and retain it through evaluation. Existing source/user evidence can remain workspace-relative. For explicit roots, use `storage:<relative-path>` for paths relative to `storage_root` or `workspace:<relative-path>` for paths relative to the workspace. Report-relative references, native absolute paths, Windows drive/UNC paths, spaces, and optional `:line:column` or `#fragment` suffixes are also supported. If an unqualified relative reference identifies different existing files in report/storage and workspace locations, validation rejects the ambiguity; choose an explicit root or absolute path. Old managed paths are resolved through migration/relocation metadata without rewriting report bodies.
+
+A top-level `evidence_refs` list can support aggregate product metrics. The helper binds records to the current cycle and proposal digest and rejects explicitly stale bindings. Path compatibility preserves a reference, not permission to read or change user data; inspect actual evidence under the applicable grant.
 
 Allowed statuses are `passed`, `failed`, and `blocked`. Failed/blocked records can omit a metric; a blocked record can omit results but must explain the actual blocker. Include `acceptance_passed`, `guardrails_passed`, and `unresolved_risks` honestly even when blocked. These records can reach evaluation and justify iteration or stopping, never success without passing evidence.
 

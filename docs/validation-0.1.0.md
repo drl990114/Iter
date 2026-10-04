@@ -1,5 +1,7 @@
 # 0.1.0 validation and limits / 验证与限制
 
+Historical storage note / 存储历史注记：The observations below predate schema-2 external storage. Keep their source hashes, paths, prompts, and outcomes as recorded; they do not validate the new layout. For current `~/.iter` storage, explicit legacy migration, and workspace relocation, see the [English guide](storage.en.md) / [中文说明](storage.md)。下文旧版证据不作为新外置布局的验证结果。
+
 Recorded September 5, 2026 for the initial `0.1.0` version. These observations record the tested scope; the GitHub Release and its exact candidate CI run establish publication status. Native session snapshots below have their own recorded source hashes.
 
 记录日期：2026-09-05，面向首个 `0.1.0` 版本。本文保留各项实际验证的范围；发布状态以 GitHub Release 及准确候选提交的 CI 为准。宿主会话使用的源码快照另有哈希记录。

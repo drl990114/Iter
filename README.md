@@ -28,7 +28,7 @@ For native plugins, updates, migration, and platform-specific setup, see the [in
 
 Start a new session after installation and ask your coding tool to use `iterate-product`.
 
-Reports follow the conversation language. New CLI cycles default to English; existing Chinese cycles continue without migration.
+Reports follow the conversation language. New CLI cycles default to English; existing Chinese cycles retain their language when migrating storage.
 
 **Explore what to build next:**
 
@@ -49,7 +49,9 @@ You may implement this scope and create isolated test data in a temporary direct
 Use iterate-product to resume the saved product iteration. Continue within the approved scope and ask only when a material decision changes.
 ```
 
-State is saved in `.product-loop/state.json`; reports live alongside it in the cycle directory. Existing authorization is reused. Publishing, external communication, and destructive operations require authorization for those actions.
+Iter stores state, reports, proposal inputs, and generated evidence outside your project, under `~/.iter` by default. Each workspace has separate storage based on its resolved path. Set `ITER_HOME` to an absolute directory outside the workspace to override the base directory. The helper's read-only `paths --workspace <path>` command shows the exact locations before initialization. Your existing source files and referenced evidence stay in place.
+
+The host needs write access to that workspace's `storage_root`; Iter does not fall back to writing workflow files into the project. Existing `.product-loop/` cycles need explicit `migrate`; moving a workspace uses `relocate`. See the [storage and migration guide](docs/storage.en.md). Saved authorization is reused for unchanged scope. Publishing, external communication, and destructive operations require authorization for those actions.
 
 **Cancel or pause:** say “Cancel this iteration” to end the current cycle while keeping its evidence. Say “Pause here; I will resume later” to keep the cycle active. Cancellation does not undo code changes. One active cycle per workspace; simultaneous writers are not supported.
 
@@ -61,6 +63,7 @@ Follow the [Note Counter walkthrough](docs/note-counter.en.md), including input,
 
 - [Installation, compatibility, and troubleshooting](docs/harnesses.en.md)
 - [Development and validation](docs/testing.en.md)
+- [Storage, migration, and workspace moves](docs/storage.en.md)
 - [Release workflow](docs/releasing.md#english)
 - [Changelog](CHANGELOG.md) · [Releases](https://github.com/drl990114/Iter/releases) · [MIT license](LICENSE)
 - [Skill workflow and resources](skills/iterate-product/)

@@ -21,9 +21,9 @@ Under the generated template's `## Sources` (English) or `## 来源` (Chinese), 
 - [direct-user] `support/ticket-123.md` — an actual user's reported blocker.
 - [community] [Discussion](https://example.com/direct-thread) — observed workaround; accessed YYYY-MM-DD.
 - [competitor] [Official docs](https://example.com/feature) — documented alternative; accessed YYYY-MM-DD.
-- [local-scenario] `evidence/baseline.txt` — actual execution, with date and conditions.
+- [local-scenario] `<evidence_dir>/baseline.txt` — actual execution, with date and conditions; replace with the absolute path returned by `paths`.
 ```
 
-Prefer primary sources for technical claims and direct pages rather than search-result pages. A future evidence filename is a planned output, not an observation. Do not contact users or upload local data without authorization.
+Prefer primary sources for technical claims and direct pages rather than search-result pages. Save generated research logs under the external `evidence_dir` returned by `paths`; existing repository files and user-provided evidence stay in place and may use workspace-relative references. A future evidence filename is a planned output, not an observation. Do not contact users or upload local data without authorization.
 
 For `local_scenario`, the approved plan may have an unmeasured baseline and pending results. Repository evidence can justify the experiment now; run tests only within the local grant. Write `01-research.md`, validate, and continue.

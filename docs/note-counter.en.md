@@ -2,6 +2,8 @@
 
 [简体中文](note-counter.zh-CN.md) · [Validation matrix](validation-0.1.0.md)
 
+The recorded sessions below used the earlier workspace storage layout. Their prompts and evidence remain unchanged. For a new trial, use the current [testing instructions](testing.en.md) and [external storage guide](storage.en.md); the historical replay does not validate schema-2 storage.
+
 Iter helps you choose the next improvement and carry the approved scope to an inspectable result. This small example uses a real Python CLI, synthetic data, and saved authorization. It is a local trial, not evidence of product demand.
 
 ## One-minute replay

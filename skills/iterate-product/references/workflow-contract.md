@@ -4,7 +4,9 @@ The single skill owns `research → differentiation → experiment → approval 
 
 ## Durable decisions
 
-- `.product-loop/state.json` is the only current phase pointer; cycle artifacts and the decision log preserve evidence and decisions.
+- The `state_path` returned by `paths --workspace` is the only current phase pointer. State, cycle artifacts, input JSON, generated evidence, and the decision log live in external workspace storage, under `~/.iter` or an absolute external `ITER_HOME`.
+- Discover storage before writing. Use the exact returned `storage_root` for host write access; never fall back to `.product-loop/` or other workflow files in the project. Existing referenced user evidence stays in place.
+- Upgrade legacy `.product-loop/` storage with explicit `migrate`; reconnect a moved workspace with explicit `relocate`. Preserve grant contents and report text during storage-only changes. A materially changed proposal or data-operation boundary still requires `revise` and applicable authorization.
 - Use the helper for initialization, grants, transitions, execution records, and revisions. Never hand-edit approval, phase, metric, selection, or validation mode to pass a gate.
 - A concrete user-selected proposal can authorize its listed implementation. Save the real decision and proposal version on initialization; the approval phase consumes that grant without another question.
 - Implementation and local-test grants are independent. Their source is a real user message, not model-generated permission. Rejection or absence of a grant cannot become approval.

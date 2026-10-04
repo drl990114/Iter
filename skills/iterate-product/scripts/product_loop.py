@@ -4,20 +4,30 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
-import os
 import re
+import shutil
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any
 from urllib.parse import urlparse
 
-STATE_DIR_NAME = ".product-loop"
+from iter_storage import (
+    LEGACY_DIR_NAME,
+    ProductLoopError,
+    StorageContext,
+    atomic_write_json,
+    atomic_write_text,
+    contained_path,
+    read_json,
+    tree_manifest,
+)
+
 STATE_FILE_NAME = "state.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 TEMPLATE_MARKER = "<!-- product-loop:fill -->"
 LOCAL_COMPLETION_LIMIT = "本机场景验证通过；真实用户价值待验证"
 REPORT_LANGUAGES = {"en", "zh-CN"}
@@ -162,10 +172,6 @@ PENALTY_SCORE_WEIGHTS = {
     "effort": 0.08,
     "risk": 0.12,
 }
-
-
-class ProductLoopError(RuntimeError):
-    """Raised for invalid Iter state or artifacts."""
 
 
 def report_language(state: dict[str, Any]) -> str:
@@ -425,48 +431,15 @@ def unused_cycle_id(workspace: Path, cycle_id: str) -> str:
 
 
 def state_dir(workspace: Path) -> Path:
-    return workspace / STATE_DIR_NAME
+    return StorageContext(workspace).root
 
 
 def state_path(workspace: Path) -> Path:
-    return state_dir(workspace) / STATE_FILE_NAME
+    return contained_path(state_dir(workspace), STATE_FILE_NAME)
 
 
 def asset_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "assets"
-
-
-def atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        if temporary_path.exists():
-            temporary_path.unlink()
-
-
-def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ProductLoopError(f"Missing file: {path}") from exc
-    except json.JSONDecodeError as exc:
-        raise ProductLoopError(f"Invalid JSON in {path}: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise ProductLoopError(f"Expected a JSON object in {path}.")
-    return payload
 
 
 def validate_state_shape(state: dict[str, Any]) -> None:
@@ -488,7 +461,7 @@ def validate_state_shape(state: dict[str, Any]) -> None:
         raise ProductLoopError(
             f"State is missing required fields: {', '.join(missing)}"
         )
-    if state["schema_version"] != SCHEMA_VERSION:
+    if state["schema_version"] not in {1, SCHEMA_VERSION}:
         raise ProductLoopError(
             f"Unsupported state schema version: {state['schema_version']}"
         )
@@ -499,6 +472,13 @@ def validate_state_shape(state: dict[str, Any]) -> None:
         raise ProductLoopError("Report language must be en or zh-CN.")
     if state["stage"] not in STAGE_SKILLS:
         raise ProductLoopError(f"Unknown stage: {state['stage']}")
+    if (
+        not isinstance(state["cycle_id"], str)
+        or normalize_cycle_id(state["cycle_id"]) != state["cycle_id"]
+    ):
+        raise ProductLoopError("Invalid cycle id in saved state.")
+    if not isinstance(state["artifacts"], dict):
+        raise ProductLoopError("State artifacts must be an object.")
     if not isinstance(state["round"], int) or not isinstance(state["max_rounds"], int):
         raise ProductLoopError("round and max_rounds must be integers.")
     if state["round"] < 1 or state["max_rounds"] < 1:
@@ -531,19 +511,31 @@ def validate_state_shape(state: dict[str, Any]) -> None:
 
 
 def load_state(workspace: Path) -> dict[str, Any]:
+    StorageContext(workspace).require_current()
     state = read_json(state_path(workspace))
     validate_state_shape(state)
+    if state["schema_version"] != SCHEMA_VERSION:
+        raise ProductLoopError(
+            "External storage requires schema 2; migrate legacy state."
+        )
+    for stage in state["artifacts"]:
+        artifact_path(workspace, state, stage)
     return state
 
 
 def save_state(workspace: Path, state: dict[str, Any]) -> None:
+    context = StorageContext(workspace)
+    context.require_current()
+    context.ensure()
     state["updated_at"] = utc_now()
     validate_state_shape(state)
+    for stage in state["artifacts"]:
+        artifact_path(workspace, state, stage)
     atomic_write_json(state_path(workspace), state)
 
 
 def append_decision(workspace: Path, payload: dict[str, Any]) -> None:
-    path = state_dir(workspace) / "decision-log.jsonl"
+    path = contained_path(state_dir(workspace), "decision-log.jsonl")
     path.parent.mkdir(parents=True, exist_ok=True)
     event = {"at": utc_now(), **payload}
     with path.open("a", encoding="utf-8") as handle:
@@ -570,8 +562,7 @@ def render_template(
 
 def artifact_mapping(cycle_id: str) -> dict[str, str]:
     return {
-        stage: f"{STATE_DIR_NAME}/cycles/{cycle_id}/{name}"
-        for stage, name in ARTIFACT_NAMES.items()
+        stage: f"cycles/{cycle_id}/{name}" for stage, name in ARTIFACT_NAMES.items()
     }
 
 
@@ -579,8 +570,10 @@ def create_cycle_templates(
     workspace: Path, state: dict[str, Any], reset_from: str | None = None
 ) -> None:
     cycle_id = state["cycle_id"]
-    cycle_dir = state_dir(workspace) / "cycles" / cycle_id
+    cycle_dir = contained_path(state_dir(workspace), f"cycles/{cycle_id}")
     cycle_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("inputs", "evidence"):
+        contained_path(cycle_dir, name).mkdir(exist_ok=True)
     replacements = {
         "CYCLE_ID": cycle_id,
         "OBJECTIVE": state["objective"],
@@ -592,7 +585,7 @@ def create_cycle_templates(
     stages = list(TEMPLATE_NAMES)
     reset_stages = set(stages[stages.index(reset_from) :]) if reset_from else set()
     for stage, template_name in TEMPLATE_NAMES.items():
-        destination = cycle_dir / ARTIFACT_NAMES[stage]
+        destination = contained_path(cycle_dir, ARTIFACT_NAMES[stage])
         if destination.exists() and stage not in reset_stages:
             continue
         atomic_write_text(
@@ -619,6 +612,8 @@ def initialize_workspace(
     new_cycle: bool = False,
     language: str = "en",
 ) -> dict[str, Any]:
+    context = StorageContext(workspace)
+    context.require_current()
     if not isinstance(language, str) or language not in REPORT_LANGUAGES:
         raise ProductLoopError("Report language must be en or zh-CN.")
     selected = normalize_proposal(proposal) if proposal is not None else None
@@ -714,20 +709,20 @@ def initialize_workspace(
         state["history"][0]["selection"] = state["selection"]
 
     root = state_dir(workspace)
-    root.mkdir(parents=True, exist_ok=True)
-    charter_path = root / "charter.md"
+    context.ensure()
+    charter_path = contained_path(root, "charter.md")
     if previous_state is not None:
-        archive_directory = root / "cycles" / previous_state["cycle_id"]
-        archived_state = archive_directory / "terminal-state.json"
+        archive_directory = contained_path(root, f"cycles/{previous_state['cycle_id']}")
+        archived_state = contained_path(archive_directory, "terminal-state.json")
         atomic_write_json(archived_state, previous_state)
         if charter_path.is_file():
             atomic_write_text(
-                archive_directory / "charter.md",
+                contained_path(archive_directory, "charter.md"),
                 charter_path.read_text(encoding="utf-8"),
             )
         state["history"][0]["previous_cycle_id"] = previous_state["cycle_id"]
         state["history"][0]["previous_state"] = str(
-            archived_state.relative_to(workspace)
+            archived_state.relative_to(root).as_posix()
         )
     if not charter_path.exists() or force or new_cycle:
         atomic_write_text(
@@ -744,7 +739,7 @@ def initialize_workspace(
                 language,
             ),
         )
-    (root / "decision-log.jsonl").touch(exist_ok=True)
+    contained_path(root, "decision-log.jsonl").touch(exist_ok=True)
     create_cycle_templates(workspace, state)
     save_state(workspace, state)
     append_decision(
@@ -760,24 +755,31 @@ def initialize_workspace(
 
 
 def artifact_path(workspace: Path, state: dict[str, Any], stage: str) -> Path:
-    resolved_workspace = workspace.resolve()
     relative = state["artifacts"].get(stage)
     if not isinstance(relative, str):
         raise ProductLoopError(f"No artifact is configured for stage: {stage}")
-    candidate = (resolved_workspace / relative).resolve()
-    try:
-        candidate.relative_to(resolved_workspace)
-    except ValueError as exc:
-        raise ProductLoopError(f"Artifact escapes workspace: {candidate}") from exc
-    return candidate
+    return contained_path(state_dir(workspace), relative)
 
 
 def reference_resolves(
-    reference: str, workspace: Path, artifact_directory: Path
+    reference: str,
+    workspace: Path,
+    artifact_directory: Path,
+    storage_root: Path | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> bool:
     reference = reference.strip().strip("<>")
+    context = StorageContext(workspace)
+    root = storage_root or context.root
+    metadata = metadata if metadata is not None else context.metadata() or {}
+    explicit_root = None
+    for prefix, base in (("storage:", root), ("workspace:", workspace)):
+        if reference.startswith(prefix):
+            explicit_root = base
+            reference = reference[len(prefix) :]
+            break
     windows_absolute = PureWindowsPath(reference).is_absolute()
-    if not windows_absolute:
+    if not windows_absolute and explicit_root is None:
         parsed = urlparse(reference)
         if parsed.scheme in {"http", "https"}:
             return bool(parsed.netloc)
@@ -787,10 +789,53 @@ def reference_resolves(
     reference = re.sub(r":\d+(?::\d+)?$", "", reference)
     if not reference:
         return False
+    if explicit_root is not None:
+        if explicit_root == workspace:
+            relative = Path(reference)
+            if (
+                relative.is_absolute()
+                or PureWindowsPath(reference).drive
+                or ".." in relative.parts
+                or ".." in PureWindowsPath(reference).parts
+            ):
+                return False
+            # User-owned source/evidence links remain valid; storage paths have
+            # the stricter no-symlink policy because Iter writes through them.
+            return (workspace / relative).is_file()
+        try:
+            return contained_path(explicit_root, reference).is_file()
+        except ProductLoopError:
+            return False
     path = Path(reference).expanduser()
+    # Aliases move storage, never rewrite historical reports or authorized scope.
+    if metadata.get("legacy_roots") and reference.startswith(LEGACY_DIR_NAME + "/"):
+        try:
+            return contained_path(root, reference[len(LEGACY_DIR_NAME) + 1 :]).is_file()
+        except ProductLoopError:
+            return False
     if path.is_absolute() or windows_absolute:
+        for field, base in (
+            ("legacy_roots", root),
+            ("previous_storage_roots", root),
+            ("previous_workspaces", workspace),
+        ):
+            for old_root in metadata.get(field, []):
+                try:
+                    relative = path.relative_to(Path(old_root))
+                except ValueError:
+                    continue
+                try:
+                    return contained_path(base, relative.as_posix()).is_file()
+                except ProductLoopError:
+                    return False
         return path.is_file()
-    return (workspace / path).is_file() or (artifact_directory / path).is_file()
+    candidates = {
+        candidate.resolve()
+        for candidate in (workspace / path, artifact_directory / path)
+        if candidate.is_file()
+    }
+    # An explicit prefix or absolute path is required for ambiguous references.
+    return len(candidates) == 1
 
 
 def source_references(line: str) -> list[str]:
@@ -1208,17 +1253,18 @@ def archive_revision_artifacts(
     workspace: Path, state: dict[str, Any]
 ) -> dict[str, str]:
     cycle_directory = artifact_path(workspace, state, "research").parent
+    revisions = contained_path(cycle_directory, "revisions")
     revision_number = 1
-    while (cycle_directory / "revisions" / f"revision-{revision_number:03}").exists():
+    while contained_path(revisions, f"revision-{revision_number:03}").exists():
         revision_number += 1
-    directory = cycle_directory / "revisions" / f"revision-{revision_number:03}"
+    directory = contained_path(revisions, f"revision-{revision_number:03}")
     snapshots: dict[str, str] = {}
     for stage, name in ARTIFACT_NAMES.items():
         source = artifact_path(workspace, state, stage)
         if source.is_file():
-            destination = directory / name
+            destination = contained_path(directory, name)
             atomic_write_text(destination, source.read_text(encoding="utf-8"))
-            snapshots[stage] = str(destination.relative_to(workspace.resolve()))
+            snapshots[stage] = destination.relative_to(state_dir(workspace)).as_posix()
     return snapshots
 
 
@@ -1625,15 +1671,379 @@ def score_file(
     return scored
 
 
+def paths_payload(workspace: Path) -> dict[str, Any]:
+    """Locate a workspace without creating files, including before initialization."""
+    context = StorageContext(workspace)
+    context.metadata()
+    path = state_path(workspace)
+    exists = path.is_file()
+    legacy_exists = context.legacy.exists() or context.legacy.is_symlink()
+    cycle_root = context.root
+    if exists:
+        state = read_json(path)
+        validate_state_shape(state)
+        cycle_root = contained_path(context.root, f"cycles/{state['cycle_id']}")
+    return {
+        "ok": True,
+        "workspace": str(context.workspace),
+        "workspace_id": context.workspace_id,
+        "iter_home": str(context.home),
+        "storage_root": str(context.root),
+        "state_path": str(path),
+        "inputs_dir": str(contained_path(cycle_root, "inputs")),
+        "evidence_dir": str(contained_path(cycle_root, "evidence")),
+        "exists": exists,
+        "legacy_exists": legacy_exists,
+        "migration_required": legacy_exists,
+    }
+
+
+def _verify_moved_references(
+    workspace: Path, source: Path, destination: Path, metadata: dict[str, Any]
+) -> None:
+    """Previously resolvable links must still resolve; unfinished reports are OK."""
+    for file in source.rglob("*"):
+        if not file.is_file() or file.suffix not in {".md", ".json", ".jsonl"}:
+            continue
+        # Only collect documented reference fields from JSON. Arbitrary strings
+        # (in particular proposal text) are not interpreted or rewritten.
+        refs: list[str] = []
+        if file.suffix == ".md":
+            for line in file.read_text(encoding="utf-8").splitlines():
+                refs.extend(source_references(line))
+        else:
+
+            def collect(value: Any) -> None:
+                if isinstance(value, dict):
+                    for key, item in value.items():
+                        if key == "evidence_refs" and isinstance(item, list):
+                            refs.extend(ref for ref in item if isinstance(ref, str))
+                        else:
+                            collect(item)
+                elif isinstance(value, list):
+                    for item in value:
+                        collect(item)
+
+            try:
+                lines = file.read_text(encoding="utf-8").splitlines()
+                if file.suffix == ".jsonl":
+                    for line in lines:
+                        if line.strip():
+                            collect(json.loads(line))
+                else:
+                    collect(json.loads("\n".join(lines)))
+            except (ValueError, UnicodeError):
+                # Preserve unrelated inputs verbatim; state.json is validated
+                # separately, and an invalid optional file cannot prove evidence.
+                continue
+        for ref in refs:
+            if reference_resolves(ref, workspace, file.parent, source, {}):
+                parent = destination / file.parent.relative_to(source)
+                if not reference_resolves(
+                    ref, workspace, parent, destination, metadata
+                ):
+                    raise ProductLoopError(f"Migration would break evidence: {ref}")
+
+
+def _finish_legacy_cleanup(context: StorageContext) -> None:
+    receipt_path = contained_path(context.root, "migration.json")
+    receipt = read_json(receipt_path)
+    if receipt.get("source") != str(context.legacy):
+        raise ProductLoopError("Migration receipt belongs to another legacy directory.")
+    expected = receipt.get("manifest")
+    if (
+        not isinstance(expected, dict)
+        or tree_manifest(contained_path(context.root, "legacy-backup")) != expected
+    ):
+        raise ProductLoopError("Legacy backup does not match the migration manifest.")
+    published = tree_manifest(context.root)
+    published.pop("migration.json", None)
+    if published != receipt.get("published_manifest"):
+        raise ProductLoopError(
+            "External storage changed or is incomplete; refusing to remove legacy files."
+        )
+    if context.legacy.exists() or context.legacy.is_symlink():
+        current = tree_manifest(context.legacy)
+        # A retry may find partially removed files, but never different/new data.
+        if (not receipt.get("cleanup_started") and current != expected) or any(
+            expected.get(name) != digest for name, digest in current.items()
+        ):
+            raise ProductLoopError("Legacy storage changed; refusing to remove it.")
+        receipt["cleanup_started"] = True
+        atomic_write_json(receipt_path, receipt)
+        for path in sorted(
+            context.legacy.rglob("*"), key=lambda p: len(p.parts), reverse=True
+        ):
+            relative = path.relative_to(context.legacy).as_posix()
+            if path.is_symlink():
+                raise ProductLoopError(f"Legacy storage changed during cleanup: {path}")
+            if path.is_file():
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                if expected.get(relative) != digest:
+                    raise ProductLoopError(
+                        f"Legacy file changed during cleanup: {path}"
+                    )
+                path.unlink()
+            elif path.is_dir() and expected.get(relative + "/") == "directory":
+                path.rmdir()
+            else:
+                raise ProductLoopError(f"Unexpected legacy file during cleanup: {path}")
+        context.legacy.rmdir()
+    receipt["complete"] = True
+    atomic_write_json(receipt_path, receipt)
+
+
+def _legacy_state(context: StorageContext) -> dict[str, Any]:
+    old_state = read_json(context.legacy / STATE_FILE_NAME)
+    validate_state_shape(old_state)
+    if old_state["schema_version"] != 1:
+        raise ProductLoopError("Expected schema 1 in legacy storage.")
+    migrated = copy.deepcopy(old_state)
+    migrated["schema_version"] = SCHEMA_VERSION
+    for stage, path in migrated["artifacts"].items():
+        if not isinstance(path, str) or not path.startswith(LEGACY_DIR_NAME + "/"):
+            raise ProductLoopError(f"Unexpected legacy artifact path: {path}")
+        relative = path[len(LEGACY_DIR_NAME) + 1 :]
+        contained_path(context.legacy, relative)
+        migrated["artifacts"][stage] = relative
+    validate_state_shape(migrated)
+    return migrated
+
+
+def _prepare_migration(context: StorageContext, receipt: dict[str, Any]) -> None:
+    inventory = receipt["manifest"]
+    if tree_manifest(context.legacy) != inventory:
+        raise ProductLoopError("Legacy storage changed; refusing to resume migration.")
+    staging = contained_path(context.root, ".migration-staging")
+    if set(path.name for path in context.root.iterdir()) - {
+        "migration.json",
+        staging.name,
+    }:
+        raise ProductLoopError("Unexpected files in pending migration storage.")
+    if staging.exists():
+        # Only discard our incomplete scratch copy after validating the intact
+        # source and rejecting links or unrecognized files in that scratch copy.
+        allowed = set(inventory) | {"workspace.json", "legacy-backup/"}
+        allowed.update("legacy-backup/" + name for name in inventory)
+        if set(tree_manifest(staging)) - allowed:
+            raise ProductLoopError(
+                "Unrecognized files in migration staging; inspect them first."
+            )
+        shutil.rmtree(staging)
+    shutil.copytree(context.legacy, staging)
+    if tree_manifest(staging) != inventory:
+        raise ProductLoopError("Legacy storage changed while copying; retry migration.")
+    shutil.copytree(context.legacy, staging / "legacy-backup")
+    if tree_manifest(staging / "legacy-backup") != inventory:
+        raise ProductLoopError("Legacy backup verification failed.")
+    metadata = context.new_metadata()
+    metadata["legacy_roots"] = [str(context.legacy)]
+    _verify_moved_references(context.workspace, context.legacy, staging, metadata)
+    atomic_write_json(staging / STATE_FILE_NAME, _legacy_state(context))
+    atomic_write_json(staging / "workspace.json", metadata)
+    receipt.update(phase="prepared", published_manifest=tree_manifest(staging))
+    atomic_write_json(context.root / "migration.json", receipt)
+
+
+def _publish_migration(context: StorageContext, receipt: dict[str, Any]) -> None:
+    staging = contained_path(context.root, ".migration-staging")
+    expected = receipt["published_manifest"]
+    published = tree_manifest(context.root)
+    published = {
+        name: digest
+        for name, digest in published.items()
+        if name != "migration.json" and not name.startswith(".migration-staging/")
+    }
+    remaining = tree_manifest(staging) if staging.exists() else {}
+    if published.keys() & remaining.keys() or {**published, **remaining} != expected:
+        raise ProductLoopError(
+            "External storage changed or is incomplete during migration."
+        )
+    if staging.exists():
+        if tree_manifest(context.legacy) != receipt["manifest"]:
+            raise ProductLoopError("Legacy storage changed before migration commit.")
+        # All renames stay within the one authorized workspace storage directory.
+        # state.json is the commit pointer and is published last.
+        for entry in sorted(
+            staging.iterdir(), key=lambda p: (p.name == STATE_FILE_NAME, p.name)
+        ):
+            entry.rename(contained_path(context.root, entry.name))
+        staging.rmdir()
+    _finish_legacy_cleanup(context)
+
+
+def migrate_workspace(workspace: Path) -> dict[str, Any]:
+    context = StorageContext(workspace)
+    context.metadata()
+    receipt_path = contained_path(context.root, "migration.json")
+    if receipt_path.exists():
+        receipt = read_json(receipt_path)
+        if receipt.get("source") != str(context.legacy):
+            raise ProductLoopError("Existing migration belongs to another workspace.")
+        if receipt.get("complete"):
+            if context.legacy.exists() or context.legacy.is_symlink():
+                raise ProductLoopError(
+                    "Legacy storage reappeared after migration; inspect the conflict."
+                )
+            return {
+                **paths_payload(workspace),
+                "migrated": False,
+                "backup_path": str(context.root / "legacy-backup"),
+            }
+    else:
+        if state_path(workspace).exists():
+            if context.legacy.exists() or context.legacy.is_symlink():
+                raise ProductLoopError(
+                    "External state already exists; refusing migration conflict."
+                )
+            return {**paths_payload(workspace), "migrated": False}
+        inventory = tree_manifest(context.legacy)
+        reserved = {
+            "workspace.json",
+            "migration.json",
+            "legacy-backup/",
+            ".migration-staging/",
+        }
+        if reserved & inventory.keys():
+            raise ProductLoopError(
+                "Legacy storage contains reserved migration filenames."
+            )
+        _legacy_state(context)  # Invalid source state never creates a destination.
+        if context.root.exists() and any(context.root.iterdir()):
+            raise ProductLoopError(
+                "External storage is not empty; refusing migration conflict."
+            )
+        context.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        receipt = {
+            "source": str(context.legacy),
+            "manifest": inventory,
+            "phase": "copying",
+            "cleanup_started": False,
+            "complete": False,
+        }
+        atomic_write_json(receipt_path, receipt)
+    if receipt.get("phase") == "copying":
+        _prepare_migration(context, receipt)
+    if receipt.get("phase") != "prepared":
+        raise ProductLoopError("Invalid pending migration phase.")
+    _publish_migration(context, receipt)
+    return {
+        **paths_payload(workspace),
+        "migrated": True,
+        "backup_path": str(context.root / "legacy-backup"),
+    }
+
+
+def relocate_workspace(workspace: Path, previous_workspace: Path) -> dict[str, Any]:
+    """Reconnect a moved directory, never merge two existing clones/worktrees."""
+    destination = StorageContext(workspace)
+    source = StorageContext(Path(previous_workspace))
+    if source.workspace == destination.workspace:
+        return {**paths_payload(workspace), "relocated": False}
+    if source.workspace.exists():
+        raise ProductLoopError(
+            "The old workspace still exists; relocation is only for moves."
+        )
+    if destination.legacy.exists() or destination.legacy.is_symlink():
+        raise ProductLoopError(
+            "Migrate legacy storage before relocating this workspace."
+        )
+    if destination.root.exists():
+        receipt_path = contained_path(destination.root, "relocation.json")
+        if receipt_path.is_file():
+            receipt = read_json(receipt_path)
+            if (
+                receipt.get("source_workspace") == str(source.workspace)
+                and receipt.get("destination_workspace") == str(destination.workspace)
+                and not source.root.exists()
+            ):
+                if receipt.get("complete"):
+                    return {**paths_payload(workspace), "relocated": False}
+                _finish_relocation(destination, receipt)
+                return {**paths_payload(workspace), "relocated": True}
+        raise ProductLoopError(
+            "Destination storage already exists; refusing relocation conflict."
+        )
+    metadata = source.metadata(check_identity=False)
+    if metadata is None or not (source.root / STATE_FILE_NAME).is_file():
+        raise ProductLoopError("No saved storage exists for the previous workspace.")
+    state = read_json(source.root / STATE_FILE_NAME)
+    validate_state_shape(state)
+    migration = contained_path(source.root, "migration.json")
+    if migration.exists() and not read_json(migration).get("complete"):
+        raise ProductLoopError("Finish pending migration before moving the workspace.")
+    manifest = tree_manifest(source.root)
+    manifest.pop("relocation.json", None)
+    updated_metadata = {
+        **metadata,
+        **destination.new_metadata(),
+        "previous_storage_roots": [
+            *metadata.get("previous_storage_roots", []),
+            str(source.root),
+        ],
+        "previous_workspaces": [
+            *metadata.get("previous_workspaces", []),
+            str(source.workspace),
+        ],
+    }
+    receipt = {
+        "source_workspace": str(source.workspace),
+        "destination_workspace": str(destination.workspace),
+        "source_metadata": metadata,
+        "destination_metadata": updated_metadata,
+        "manifest": manifest,
+        "complete": False,
+    }
+    pending = contained_path(source.root, "relocation.json")
+    if pending.exists() and not read_json(pending).get("complete"):
+        if read_json(pending) != receipt:
+            raise ProductLoopError(
+                "Another relocation is pending; rerun its original command."
+            )
+    atomic_write_json(pending, receipt)
+    # Rename on the same ITER_HOME filesystem; retain the state/grants byte for byte.
+    destination.root.parent.mkdir(parents=True, exist_ok=True)
+    source.root.rename(destination.root)
+    _finish_relocation(destination, receipt)
+    return {**paths_payload(workspace), "relocated": True}
+
+
+def _finish_relocation(destination: StorageContext, receipt: dict[str, Any]) -> None:
+    expected = dict(receipt["manifest"])
+    expected.pop("workspace.json", None)
+    actual = tree_manifest(destination.root)
+    actual.pop("relocation.json", None)
+    actual.pop("workspace.json", None)
+    metadata_path = contained_path(destination.root, "workspace.json")
+    metadata = read_json(metadata_path)
+    updated = receipt["destination_metadata"]
+    if (
+        actual != expected
+        or metadata not in (receipt["source_metadata"], updated)
+        or any(
+            updated.get(key) != value
+            for key, value in destination.new_metadata().items()
+        )
+    ):
+        raise ProductLoopError(
+            "Relocation storage or workspace changed; refusing ownership transfer."
+        )
+    atomic_write_json(metadata_path, updated)
+    receipt["complete"] = True
+    atomic_write_json(destination.root / "relocation.json", receipt)
+
+
 def status_payload(workspace: Path) -> dict[str, Any]:
+    paths = paths_payload(workspace)
+    if not paths["exists"] or paths["migration_required"]:
+        return paths
     state = load_state(workspace)
     stage = state["stage"]
     artifact = None
     if stage in ARTIFACT_NAMES:
         artifact = str(artifact_path(workspace, state, stage))
     return {
-        "ok": True,
-        "workspace": str(workspace),
+        **paths,
         "cycle_id": state["cycle_id"],
         "stage": stage,
         "status": state["status"],
@@ -1670,7 +2080,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="Initialize .product-loop state.")
+    for command, help_text in (
+        ("paths", "Locate Iter storage without creating files."),
+        ("migrate", "Verify and move legacy .product-loop storage to ITER_HOME."),
+        ("relocate", "Reconnect saved state after moving a workspace directory."),
+    ):
+        command_parser = subparsers.add_parser(command, help=help_text)
+        command_parser.add_argument("--workspace", required=True)
+        if command == "relocate":
+            command_parser.add_argument(
+                "--from", dest="previous_workspace", required=True
+            )
+
+    init_parser = subparsers.add_parser(
+        "init", help="Initialize user-level Iter state."
+    )
     init_parser.add_argument("--workspace", required=True)
     init_parser.add_argument("--objective")
     init_parser.add_argument("--metric")
@@ -1770,6 +2194,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         }
 
     workspace = normalize_workspace(args.workspace)
+    if args.command == "paths":
+        return paths_payload(workspace)
+    if args.command == "migrate":
+        return migrate_workspace(workspace)
+    if args.command == "relocate":
+        return relocate_workspace(workspace, Path(args.previous_workspace))
     if args.command == "init":
         state = initialize_workspace(
             workspace=workspace,
@@ -1791,7 +2221,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             new_cycle=args.new_cycle,
             language=args.language,
         )
-        return {"ok": True, "state": state, "workspace": str(workspace)}
+        return {**paths_payload(workspace), "state": state}
     if args.command == "status":
         return status_payload(workspace)
     if args.command == "validate":
@@ -1862,7 +2292,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         result = run(args)
-    except ProductLoopError as exc:
+    except (ProductLoopError, OSError) as exc:
         print_json({"ok": False, "error": str(exc)})
         return 2
     print_json(result)

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Store workflow state, reports, proposal/execution inputs, and generated evidence outside product workspaces under `~/.iter`, with an absolute external `ITER_HOME` override and separate storage for each resolved workspace path. Read-only `paths` discovers storage before initialization; an empty `status` returns `exists: false`.
+- Add explicit schema-2 migration from `.product-loop/`, retaining an external backup before removing the old workflow directory, and `relocate` for workspace moves. Preserve existing grants and report text; keep referenced user evidence in place. Hosts need write access to the exact workspace storage root; unavailable access never falls back to project files.
+- 状态、报告、方案与执行输入、生成证据改为默认存入项目外的 `~/.iter`，支持绝对外置目录 `ITER_HOME`，按工作区真实路径隔离。新增只读路径发现、旧 `.product-loop/` 的显式迁移与外置备份，以及移动工作区后的重关联；保留原授权和报告正文，已有用户证据不搬移。
+
 ## 0.1.0
 
 Initial release, prepared for publication through the manual [Release workflow](docs/releasing.md). The tag and GitHub Release record the actual publication date.

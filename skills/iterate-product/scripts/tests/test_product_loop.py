@@ -12,10 +12,24 @@ from unittest.mock import patch
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "product_loop.py"
 SKILL_PATH = Path(__file__).resolve().parents[2] / "SKILL.md"
+sys.path.insert(0, str(SCRIPT_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("product_loop", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
 product_loop = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = product_loop
 SPEC.loader.exec_module(product_loop)
+
+
+def isolated_workspace(test: unittest.TestCase) -> Path:
+    temporary_directory = tempfile.TemporaryDirectory()
+    test.addCleanup(temporary_directory.cleanup)
+    root = Path(temporary_directory.name).resolve()
+    workspace = root / "project"
+    workspace.mkdir()
+    environment = patch.dict(os.environ, {"ITER_HOME": str(root / "iter-home")})
+    environment.start()
+    test.addCleanup(environment.stop)
+    return workspace
 
 
 def filled_markdown(
@@ -78,8 +92,7 @@ def product_metric_evidence(workspace: Path, status: str = "passed") -> dict:
 
 class ProductLoopTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
-        self.workspace = Path(self.temporary_directory.name)
+        self.workspace = isolated_workspace(self)
         product_loop.initialize_workspace(
             workspace=self.workspace,
             objective="Improve activation",
@@ -90,9 +103,6 @@ class ProductLoopTests(unittest.TestCase):
             max_rounds=2,
             language="zh-CN",
         )
-
-    def tearDown(self) -> None:
-        self.temporary_directory.cleanup()
 
     def test_orchestrator_runs_until_a_real_decision_boundary(self) -> None:
         instructions = SKILL_PATH.read_text(encoding="utf-8")
@@ -373,17 +383,13 @@ def selected_proposal(mode: str = "local_scenario") -> dict:
 
 class SelectedProposalTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
-        self.workspace = Path(self.temporary_directory.name)
+        self.workspace = isolated_workspace(self)
         (self.workspace / "README.md").write_text(
             "Existing setup behavior", encoding="utf-8"
         )
         (self.workspace / "result.txt").write_text(
             "Observed two setup steps", encoding="utf-8"
         )
-
-    def tearDown(self) -> None:
-        self.temporary_directory.cleanup()
 
     def initialize(
         self,
@@ -475,7 +481,7 @@ class SelectedProposalTests(unittest.TestCase):
         self.assertEqual(state["selected_id"], "activation")
         self.assertTrue(product_loop.authorization_valid(state, "implementation"))
         self.assertFalse(product_loop.authorization_valid(state, "local"))
-        self.assertEqual(state["schema_version"], 1)
+        self.assertEqual(state["schema_version"], 2)
         self.assertIsNone(state["metric"]["baseline"])
         self.assertEqual(state, product_loop.load_state(self.workspace))
 
@@ -905,7 +911,7 @@ class SelectedProposalTests(unittest.TestCase):
             authorization_evidence="User approved the revised target and local test",
         )
         archived = (
-            self.workspace
+            product_loop.state_dir(self.workspace)
             / state["history"][-1]["previous"]["artifact_snapshots"]["experiment"]
         )
         self.assertEqual(archived.read_text(encoding="utf-8"), old_experiment)
@@ -983,7 +989,10 @@ class SelectedProposalTests(unittest.TestCase):
             authorization_evidence="User chose this next feature",
             new_cycle=True,
         )
-        archived = self.workspace / state["history"][0]["previous_state"]
+        archived = (
+            product_loop.state_dir(self.workspace)
+            / state["history"][0]["previous_state"]
+        )
         self.assertEqual(product_loop.read_json(archived)["cycle_id"], "selected")
         self.assertEqual(state["selected_id"], "new-feature")
         self.assertFalse(product_loop.authorization_valid(state, "implementation"))
@@ -1002,11 +1011,13 @@ class PublicTrialTests(unittest.TestCase):
         self.workspace = self.fixture.workspace
 
     def tearDown(self) -> None:
-        self.fixture.tearDown()
+        self.fixture.doCleanups()
 
     def snapshot(self) -> dict[str, bytes]:
         return {
-            str(path.relative_to(self.workspace)): path.read_bytes()
+            str(
+                path.relative_to(product_loop.state_dir(self.workspace))
+            ): path.read_bytes()
             for path in product_loop.state_dir(self.workspace).rglob("*")
             if path.is_file()
         }
@@ -1049,7 +1060,7 @@ class PublicTrialTests(unittest.TestCase):
             authorization_evidence="The user selected a new iteration",
         )
         archived = product_loop.read_json(
-            self.workspace / new["history"][0]["previous_state"]
+            product_loop.state_dir(self.workspace) / new["history"][0]["previous_state"]
         )
         self.assertEqual(archived, state)
         for stage, content in artifacts.items():

@@ -1,5 +1,7 @@
 # 0.1.0 release preparation / 发布准备
 
+Storage update / 存储更新：The preparation text below records the original `.product-loop/` layout. The current change uses schema-2 external storage; see [storage and migration](storage.en.md) / [存储与迁移](storage.md) and CHANGELOG's `Unreleased` entry. 下文首版草稿保留原貌；现行操作应按新指南显式迁移旧周期。
+
 This document contains preparation material for the initial version. Consult [GitHub Releases](https://github.com/drl990114/Iter/releases) for publication status. Repository visibility changes, tags, GitHub releases, and invitations are separate final publication steps.
 
 以下是首个版本的可审阅发布材料，实际状态见 [GitHub Releases](https://github.com/drl990114/Iter/releases)；开放仓库、创建 tag / GitHub Release 和发送邀请属于后续发布步骤。

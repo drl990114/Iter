@@ -6,6 +6,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -18,6 +19,12 @@ def main() -> None:
         help="Optional host executable; does not change global installation",
     )
     parser.add_argument("--workspace", type=Path, required=True)
+    parser.add_argument(
+        "--skill-dir",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "skills" / "iterate-product",
+        help="Skill directory whose helper resolves storage; defaults to this checkout",
+    )
     parser.add_argument("--prompt-file", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=180)
@@ -27,6 +34,22 @@ def main() -> None:
         [executable, "--version"], capture_output=True, text=True, check=True
     ).stdout.strip()
     workspace = args.workspace.resolve()
+    helper = args.skill_dir.resolve() / "scripts" / "product_loop.py"
+    paths = json.loads(
+        subprocess.run(
+            [sys.executable, str(helper), "paths", "--workspace", str(workspace)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+            timeout=10,
+        ).stdout
+    )
+    if paths["migration_required"]:
+        parser.error("Migrate the workspace's legacy Iter state before a native trial.")
+    storage_root = Path(paths["storage_root"])
+    storage_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    environment = {**os.environ, "ITER_HOME": paths["iter_home"]}
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     prompt = args.prompt_file.read_text(encoding="utf-8")
@@ -40,6 +63,8 @@ def main() -> None:
             "--skip-git-repo-check",
             "--sandbox",
             "workspace-write",
+            "--add-dir",
+            str(storage_root),
             "-c",
             'approval_policy="never"',
             "--ephemeral",
@@ -57,6 +82,8 @@ def main() -> None:
             "--verbose",
             "--permission-mode",
             "acceptEdits",
+            "--add-dir",
+            str(storage_root),
             "--no-session-persistence",
             "--strict-mcp-config",
             "--mcp-config",
@@ -82,6 +109,7 @@ def main() -> None:
             stderr=stderr,
             text=True,
             encoding="utf-8",
+            env=environment,
             start_new_session=os.name != "nt",
         )
         timed_out = False
@@ -112,6 +140,8 @@ def main() -> None:
         "timed_out": timed_out,
         "elapsed_seconds": round(time.monotonic() - started, 2),
         "output": str(output),
+        "storage_root": str(storage_root),
+        "state_path": paths["state_path"],
         "note": "Process completion alone does not establish behavioral success. Inspect the transcript and artifacts.",
     }
     (output / "process.json").write_text(
