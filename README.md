@@ -30,6 +30,8 @@ Start a new session after installation and ask your coding tool to use `iterate-
 
 Reports follow the conversation language. New CLI cycles default to English; existing Chinese cycles retain their language when migrating storage.
 
+Once you ask to develop the chosen scope, Iter completes implementation, necessary verification, and review, then closes the cycle automatically. Your next iteration request starts a fresh cycle by default; you do not need to say "start another iteration". Unfinished work resumes from its saved state. Asking about a previous result only reads that result.
+
 **Explore what to build next:**
 
 ```text

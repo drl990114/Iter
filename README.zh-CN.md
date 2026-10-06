@@ -40,6 +40,8 @@ npx skills add /absolute/path/to/Iter --skill iterate-product --copy
 
 报告语言跟随当前对话；旧中文周期在迁移存储后保留原语言。直接使用 Python CLI 新建周期时，默认英文，可传 `--language zh-CN`。
 
+选定范围并要求开始开发后，Iter 会完成开发、必要验证和复盘，自动结束本轮。之后再次要求迭代时，默认开启新一轮，不必额外说「开始新一轮迭代」。尚未完成的工作会从保存的位置继续；明确询问上一轮结果时只查看记录。
+
 ### 探索下一步
 
 ```text

@@ -1,6 +1,6 @@
 # Workflow contract
 
-The single skill owns `research → differentiation → experiment → approval → development → evaluation`. Evaluation chooses `complete`, `iterate`, or `stop`; `iterate` creates a new cycle and returns to research. The maximum-round budget applies.
+The single skill owns `research → differentiation → experiment → approval → development → evaluation`. A request to develop ends with automatic evaluation and cycle closure after implementation and necessary verification, without another completion request. Evaluation chooses `complete`, `iterate`, or `stop`; reserve `iterate`, which creates a new cycle and returns to research, for user-requested continued rounds within the maximum-round budget. The default is one delivery cycle.
 
 ## Durable decisions
 
@@ -12,7 +12,7 @@ The single skill owns `research → differentiation → experiment → approval 
 - Implementation and local-test grants are independent. Their source is a real user message, not model-generated permission. Rejection or absence of a grant cannot become approval.
 - Research and baseline measurements can add evidence. Material changes to scope, target, acceptance, validation mode, data operations, or risk require a presented revision and matching grant.
 - A revision preserves previous artifacts and decisions, updates the contract consistently, and clears inapplicable results. Never silently replace an approved real-user metric with a local task metric.
-- A user-requested new iteration after a terminal result uses `init --new-cycle`, preserving the previous cycle and audit log. Never overwrite an active cycle to restart it.
+- After a terminal result, the next iteration request starts fresh by default using `init --new-cycle` with the selected proposal and its actual grants, preserving the previous cycle and audit log. No explicit "new iteration" wording is needed. A request only to inspect or discuss the previous result reads it without initializing. Resume unfinished active work; never overwrite an active cycle to restart it.
 - Record withdrawn permissions with the authorization revocation flags; denial is not a grant.
 - An explicit user cancellation or rejection ends any active phase with `stop`. Preserve artifacts and decisions, skip unfinished-report gates, and never authorize implementation merely to reach a terminal stage. A request to pause keeps the cycle active.
 - Iteration clears executed results. Reuse only grants whose recorded scope still covers the current contract; honor permissions limited to one cycle.
